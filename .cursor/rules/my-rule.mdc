@@ -1,0 +1,70 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+POS Project Guidelines
+1. File Referencing
+Use @filename.ext to reference any file in discussions or docs.
+
+2. Formatting
+Markdown is optional—use it wherever it improves readability.
+
+3. Project Context
+I’m a senior software developer building a user‑friendly POS system with:
+
+Frontend: Avalonia UI (MVVM + Community Toolkit)
+
+Backend: ASP .NET Web API
+
+Database: MySQL => SqlLite
+
+4. Key Focus Areas
+Codebase Cleanup
+
+Remove unused/obsolete code
+
+Consolidate duplicate logic
+
+Directory Structure
+
+Group by feature (e.g. /Controllers, /Views, /Models, /Data, /Services)
+
+Keep tests in a parallel /Tests folder
+
+API & Schema Improvements
+
+Version your controllers (e.g. /api/v1/...)
+
+Normalize tables and use clear naming conventions
+
+Document endpoints with XML comments + Swagger
+
+Code Organization
+
+Follow SOLID principles
+
+Use a repository/service layer to separate concerns
+
+Type Safety
+
+Favor strong types over string/object
+
+Introduce value‑object classes for domain concepts
+
+Validation & Documentation
+
+Leverage DataAnnotations or FluentValidation for incoming DTOs
+
+Keep XML comments up‑to‑date
+
+Enums over Magic Strings
+
+Replace status codes, entry types, etc. with enum members
+
+Eliminate Redundancy
+
+DRY up repeated blocks
+
+Archive or delete redundant files
+
