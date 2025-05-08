@@ -92,6 +92,7 @@ namespace EBISX_POS.API.Data
                             new SaleType { Name = "DEBIT", Account = "A/R - DEBIT", Type = "CHARGE" },
                             new SaleType { Name = "CREDIT", Account = "A/R - CREDIT", Type = "CHARGE" },
                         };
+
                         context.SaleType.AddRange(saleTypes);
                         Debug.WriteLine("Added sale types to database");
 

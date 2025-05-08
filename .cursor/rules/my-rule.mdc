@@ -17,7 +17,7 @@ Frontend: Avalonia UI (MVVM + Community Toolkit)
 
 Backend: ASP .NET Web API
 
-Database: MySQL => SqlLite
+Database: SqlLite
 
 4. Key Focus Areas
 Codebase Cleanup
