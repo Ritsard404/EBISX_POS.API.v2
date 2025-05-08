@@ -250,6 +250,12 @@ namespace EBISX_POS.API.Services.Repositories
                 );
             }
 
+            // If manager was supplied but not found, return error
+            if (!string.IsNullOrWhiteSpace(dto.ManagerEmail) && manager == null)
+            {
+                return (false, false, "", "Invalid manager credentials");
+            }
+
             // --- Cashier login (may have manager approval) ---
             var timestamp = new Timestamp
             {
