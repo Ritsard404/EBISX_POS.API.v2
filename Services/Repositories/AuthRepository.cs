@@ -38,31 +38,50 @@ namespace EBISX_POS.API.Services.Repositories
             var manager = await _dataContext.User
                 .FirstOrDefaultAsync(m => m.UserEmail == managerEmail && m.UserRole != "Cashier" && m.IsActive);
 
+            if (manager is null)
+                return (false, "Invalid manager credentials.");
 
             if (timestamp?.CashInDrawerAmount is not { } available)
                 return (false, "No active session or drawer amount not set.");
 
             var tsIn = timestamp.TsIn;
 
-            decimal totalCashInDrawer = await _dataContext.Order
-                    .Where(o =>
-                        o.Cashier.UserEmail == cashierEmail &&
-                        !o.IsCancelled &&
-                        !o.IsPending &&
-                        !o.IsReturned &&
-                        o.CreatedAt >= tsIn &&
-                        o.CashTendered != null &&
-                        o.TotalAmount != 0
-                    )
-                    .SumAsync(o =>
-                        o.CashTendered!.Value - o.ChangeAmount!.Value
-                    );
+            //decimal totalCashInDrawer = await _dataContext.Order
+            //        .Where(o =>
+            //            o.Cashier.UserEmail == cashierEmail &&
+            //            !o.IsCancelled &&
+            //            !o.IsPending &&
+            //            !o.IsReturned &&
+            //            o.CreatedAt >= tsIn &&
+            //            o.CashTendered != null &&
+            //            o.TotalAmount != 0
+            //        )
+            //        .SumAsync(o =>
+            //            o.CashTendered!.Value - o.ChangeAmount!.Value
+            //        );
+
+            // First get all valid orders for the cashier
+            var orders = await _dataContext.Order
+                .Include(o => o.Cashier)
+                .ToListAsync();
+
+            orders = orders
+                .Where(o =>
+                    o.Cashier.UserEmail == cashierEmail &&
+                    !o.IsCancelled &&
+                    !o.IsPending &&
+                    !o.IsReturned &&
+                    o.CreatedAt >= tsIn &&
+                    o.CashTendered != null &&
+                    o.TotalAmount != 0)
+                .ToList();
+
+            // Then calculate the total in memory
+            decimal totalCashInDrawer = orders.Sum(o =>
+                o.CashTendered!.Value - o.ChangeAmount!.Value);
 
             if (cash > available + totalCashInDrawer)
                 return (false, "Withdrawal exceeds drawer balance.");
-
-            if (manager is null)
-                return (false, "Invalid manager credentials.");
 
             timestamp.ManagerLog.Add(new UserLog
             {
