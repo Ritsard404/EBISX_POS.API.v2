@@ -105,7 +105,7 @@ namespace EBISX_POS.API.Services.Repositories
             try
             {
                 return await _dataContext.User
-                    .Where(u => u.IsActive)
+                    //.Where(u => u.IsActive)
                     .OrderBy(u => u.UserFName)
                     .ThenBy(u => u.UserLName)
                     .ToListAsync();
@@ -165,7 +165,7 @@ namespace EBISX_POS.API.Services.Repositories
                 existingUser.UserFName = user.UserFName;
                 existingUser.UserLName = user.UserLName;
                 existingUser.UserRole = user.UserRole;
-                //existingUser.IsActive = user.IsActive;
+                existingUser.IsActive = user.IsActive;
                 existingUser.UpdatedAt = DateTime.UtcNow;
 
                 // Log the action

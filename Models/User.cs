@@ -33,5 +33,12 @@ namespace EBISX_POS.API.Models
         [JsonIgnore]
         [NotMapped]
         public string FullName => $"{UserFName} {UserLName}";
+
+        [NotMapped]
+        public string Status
+        {
+            get => IsActive ? "Active" : "Inactive";
+            set => IsActive = string.Equals(value, "Active", StringComparison.OrdinalIgnoreCase);
+        }
     }
 }
