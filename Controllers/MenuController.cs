@@ -62,12 +62,12 @@ namespace EBISX_POS.API.Controllers
         {
             try
             {
-                var (isSuccess, message, menus) = await _menu.AddMenu(menu, managerEmail);
+                var (isSuccess, message) = await _menu.AddMenu(menu, managerEmail);
                 if (!isSuccess)
                 {
                     return BadRequest(new { message });
                 }
-                return Ok(new { message, menus });
+                return Ok(new { message });
             }
             catch (Exception ex)
             {

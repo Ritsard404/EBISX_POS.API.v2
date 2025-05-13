@@ -27,7 +27,7 @@ namespace EBISX_POS.API.Services.Interfaces
 
 
         // Menu CRUD Operations
-        Task<(bool isSuccess, string message, List<Menu> menus)> AddMenu(Menu menu, string managerEmail);
+        Task<(bool isSuccess, string message)> AddMenu(Menu menu, string managerEmail);
         Task<List<Menu>> GetAllMenus();
         Task<Menu?> GetMenuById(int id);
         Task<(bool isSuccess, string message)> UpdateMenu(Menu menu, string managerEmail);

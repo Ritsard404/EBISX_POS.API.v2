@@ -673,7 +673,7 @@ namespace EBISX_POS.API.Services.Repositories
         #endregion
 
         #region Menu Operations
-        public async Task<(bool isSuccess, string message, List<Menu> menus)> AddMenu(Menu menu, string managerEmail)
+        public async Task<(bool isSuccess, string message)> AddMenu(Menu menu, string managerEmail)
         {
             try
             {
@@ -681,30 +681,30 @@ namespace EBISX_POS.API.Services.Repositories
                 var manager = await ValidateManager(managerEmail);
                 if (manager == null)
                 {
-                    return (false, "Unauthorized: Invalid manager credentials", new List<Menu>());
+                    return (false, "Unauthorized: Invalid manager credentials");
                 }
 
                 // Validate menu
                 if (string.IsNullOrWhiteSpace(menu.MenuName))
                 {
-                    return (false, "Menu name is required", new List<Menu>());
+                    return (false, "Menu name is required");
                 }
 
                 if (menu.MenuPrice <= 0)
                 {
-                    return (false, "Menu price must be greater than 0", new List<Menu>());
+                    return (false, "Menu price must be greater than 0");
                 }
 
                 if (menu.Category == null)
                 {
-                    return (false, "Category is required", new List<Menu>());
+                    return (false, "Category is required");
                 }
 
                 // Check if category exists
                 var category = await _dataContext.Category.FindAsync(menu.Category.Id);
                 if (category == null)
                 {
-                    return (false, "Category not found", new List<Menu>());
+                    return (false, "Category not found");
                 }
 
                 // Check if drink type exists if provided
@@ -713,7 +713,7 @@ namespace EBISX_POS.API.Services.Repositories
                     var drinkType = await _dataContext.DrinkType.FindAsync(menu.DrinkType.Id);
                     if (drinkType == null)
                     {
-                        return (false, "Drink type not found", new List<Menu>());
+                        return (false, "Drink type not found");
                     }
                 }
 
@@ -723,7 +723,7 @@ namespace EBISX_POS.API.Services.Repositories
                     var addOnType = await _dataContext.AddOnType.FindAsync(menu.AddOnType.Id);
                     if (addOnType == null)
                     {
-                        return (false, "Add-on type not found", new List<Menu>());
+                        return (false, "Add-on type not found");
                     }
                 }
 
@@ -748,12 +748,12 @@ namespace EBISX_POS.API.Services.Repositories
                     .OrderBy(m => m.MenuName)
                     .ToListAsync();
 
-                return (true, "Menu added successfully", menus);
+                return (true, "Menu added successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error adding menu");
-                return (false, "An error occurred while adding the menu", new List<Menu>());
+                return (false, "An error occurred while adding the menu");
             }
         }
 
