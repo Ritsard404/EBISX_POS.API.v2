@@ -22,14 +22,17 @@ namespace EBISX_POS.API.Services.Repositories
                 }
 
                 // Check if user already exists
-                if (await _dataContext.User.AnyAsync(u => u.UserEmail == user.UserEmail))
+                var normalizedEmail = user.UserEmail.ToUpper();
+
+                if (await _dataContext.User
+                        .AnyAsync(u => u.UserEmail.ToUpper() == normalizedEmail))
                 {
                     return (false, "User with this email already exists", new List<User>());
                 }
 
                 // Check if this is the first user
                 var isFirstUser = !await _dataContext.User.AnyAsync();
-                
+
                 // Validate manager email requirement
                 if (!isFirstUser)
                 {
@@ -40,8 +43,8 @@ namespace EBISX_POS.API.Services.Repositories
 
                     // Verify manager exists and has appropriate role
                     var manager = await _dataContext.User
-                        .FirstOrDefaultAsync(u => u.UserEmail == managerEmail && 
-                                                u.UserRole == UserRole.Manager.ToString() && 
+                        .FirstOrDefaultAsync(u => u.UserEmail == managerEmail &&
+                                                (u.UserRole == UserRole.Manager.ToString() || u.UserRole == "Developer") &&
                                                 u.IsActive);
 
                     if (manager == null)
@@ -72,8 +75,8 @@ namespace EBISX_POS.API.Services.Repositories
                 if (!isFirstUser)
                 {
                     var manager = await _dataContext.User
-                        .FirstOrDefaultAsync(u => u.UserEmail == managerEmail && 
-                                                u.UserRole == UserRole.Manager.ToString() && 
+                        .FirstOrDefaultAsync(u => u.UserEmail == managerEmail &&
+                                                u.UserRole == UserRole.Manager.ToString() &&
                                                 u.IsActive);
                     userLog.Manager = manager;
                 }
@@ -106,6 +109,7 @@ namespace EBISX_POS.API.Services.Repositories
             {
                 return await _dataContext.User
                     //.Where(u => u.IsActive)
+                    .Where(u => u.UserRole != "Developer")
                     .OrderBy(u => u.UserFName)
                     .ThenBy(u => u.UserLName)
                     .ToListAsync();
@@ -131,8 +135,8 @@ namespace EBISX_POS.API.Services.Repositories
 
                 // Verify manager exists and has appropriate role
                 var manager = await _dataContext.User
-                    .FirstOrDefaultAsync(u => u.UserEmail == managerEmail && 
-                                            u.UserRole == UserRole.Manager.ToString() && 
+                    .FirstOrDefaultAsync(u => u.UserEmail == managerEmail &&
+                                            u.UserRole == UserRole.Manager.ToString() &&
                                             u.IsActive);
 
                 if (manager == null)
@@ -177,7 +181,7 @@ namespace EBISX_POS.API.Services.Repositories
                 });
 
                 await _dataContext.SaveChangesAsync();
-                _logger.LogInformation("User updated: {Email} by manager: {ManagerEmail}", 
+                _logger.LogInformation("User updated: {Email} by manager: {ManagerEmail}",
                     user.UserEmail, managerEmail);
 
                 return (true, "User updated successfully");
@@ -195,8 +199,8 @@ namespace EBISX_POS.API.Services.Repositories
             {
                 // Verify manager exists and has appropriate role
                 var manager = await _dataContext.User
-                    .FirstOrDefaultAsync(u => u.UserEmail == managerEmail && 
-                                            u.UserRole == UserRole.Manager.ToString() && 
+                    .FirstOrDefaultAsync(u => u.UserEmail == managerEmail &&
+                                            u.UserRole == UserRole.Manager.ToString() &&
                                             u.IsActive);
 
                 if (manager == null)
@@ -244,7 +248,7 @@ namespace EBISX_POS.API.Services.Repositories
                 });
 
                 await _dataContext.SaveChangesAsync();
-                _logger.LogInformation("User deactivated: {Email} by manager: {ManagerEmail}", 
+                _logger.LogInformation("User deactivated: {Email} by manager: {ManagerEmail}",
                     userEmail, managerEmail);
 
                 return (true, "User deactivated successfully");
