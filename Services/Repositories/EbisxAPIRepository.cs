@@ -5,8 +5,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EBISX_POS.API.Services.Repositories
 {
-    public class EbisxAPIRepository(DataContext _dataContext, ILogger<EbisxAPIRepository> _logger) : IEbisxAPI
+    public class EbisxAPIRepository : IEbisxAPI
     {
+        private readonly DataContext _dataContext;
+        private readonly ILogger<EbisxAPIRepository> _logger;
+
+        public EbisxAPIRepository(DataContext dataContext, ILogger<EbisxAPIRepository> logger)
+        {
+            _dataContext = dataContext;
+            _logger = logger;
+        }
+
         public Task<(bool, string)> FetchSaleTypes()
         {
             throw new NotImplementedException();
@@ -61,6 +70,61 @@ namespace EBISX_POS.API.Services.Repositories
         public async Task<PosTerminalInfo> PosTerminalInfo()
         {
             return await _dataContext.PosTerminalInfo.AsNoTracking().SingleOrDefaultAsync();
+        }
+
+        public async Task<(bool IsValid, string Message)> ValidateTerminalExpiration()
+        {
+            var terminalInfo = await PosTerminalInfo();
+            if (terminalInfo == null)
+            {
+                return (false, "POS terminal is not configured.");
+            }
+
+            if (await IsTerminalExpired())
+            {
+                return (false, "POS terminal has expired. Please contact your administrator.");
+            }
+
+            if (await IsTerminalExpiringSoon())
+            {
+                return (true, "Warning: POS terminal will expire soon. Please contact your administrator.");
+            }
+
+            return (true, "POS terminal is valid.");
+        }
+
+        public async Task<bool> IsTerminalExpired()
+        {
+            var terminalInfo = await PosTerminalInfo();
+            if (terminalInfo == null)
+            {
+                return true;
+            }
+
+            return DateTime.Now > terminalInfo.ValidUntil;
+        }
+
+        public async Task<bool> IsTerminalExpiringSoon()
+        {
+            var terminalInfo = await PosTerminalInfo();
+            if (terminalInfo == null)
+            {
+                return false;
+            }
+
+            var oneWeekFromNow = DateTime.Now.AddDays(7);
+            return DateTime.Now <= terminalInfo.ValidUntil && terminalInfo.ValidUntil <= oneWeekFromNow;
+        }
+
+        public async Task<int> GetRemainingDays()
+        {
+            var terminalInfo = await PosTerminalInfo();
+            if (terminalInfo == null)
+            {
+                return 0;
+            }
+
+            return (int)(terminalInfo.ValidUntil - DateTime.Now).TotalDays;
         }
     }
 }

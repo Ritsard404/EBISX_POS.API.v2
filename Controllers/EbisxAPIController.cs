@@ -8,8 +8,15 @@ namespace EBISX_POS.API.Controllers
 {
     [Route("api/[controller]/[action]")]
     [ApiController]
-    public class EbisxAPIController(IEbisxAPI _ebisx) : ControllerBase
+    public class EbisxAPIController : ControllerBase
     {
+        private readonly IEbisxAPI _ebisx;
+
+        public EbisxAPIController(IEbisxAPI ebisx)
+        {
+            _ebisx = ebisx;
+        }
+
         [HttpPost]
         public async Task<IActionResult> SetPosTerminalInfo(PosTerminalInfo posTerminalInfo)
         {
@@ -29,6 +36,33 @@ namespace EBISX_POS.API.Controllers
                 return NotFound("POS terminal not configured.");
 
             return Ok(info);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ValidateTerminal()
+        {
+            var (isValid, message) = await _ebisx.ValidateTerminalExpiration();
+            if (!isValid)
+            {
+                return BadRequest(new { isValid, message });
+            }
+            return Ok(new { isValid, message });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> CheckTerminalExpiration()
+        {
+            var isExpired = await _ebisx.IsTerminalExpired();
+            var isExpiringSoon = await _ebisx.IsTerminalExpiringSoon();
+            
+            return Ok(new 
+            { 
+                isExpired,
+                isExpiringSoon,
+                message = isExpired ? "Terminal has expired" : 
+                         isExpiringSoon ? "Terminal will expire soon" : 
+                         "Terminal is valid"
+            });
         }
     }
 }

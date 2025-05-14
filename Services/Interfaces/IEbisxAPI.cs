@@ -1,5 +1,4 @@
-﻿
-using EBISX_POS.API.Models;
+﻿using EBISX_POS.API.Models;
 
 namespace EBISX_POS.API.Services.Interfaces
 {
@@ -9,6 +8,9 @@ namespace EBISX_POS.API.Services.Interfaces
         Task<(bool, string)> FetchSaleTypes();
         Task<(bool IsSuccess, string Message)> SetPosTerminalInfo(PosTerminalInfo posTerminalInfo);
         Task<PosTerminalInfo> PosTerminalInfo();
-
+        Task<(bool IsValid, string Message)> ValidateTerminalExpiration();
+        Task<bool> IsTerminalExpired();
+        Task<bool> IsTerminalExpiringSoon();
+        Task<int> GetRemainingDays();
     }
 }

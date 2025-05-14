@@ -14,6 +14,7 @@ builder.Configuration.SetBasePath(baseDir)
 // Configure services
 builder.Services.AddApplicationServices(builder.Configuration);
 
+
 var app = builder.Build();
 builder.WebHost.UseUrls("http://localhost:5166");
 
