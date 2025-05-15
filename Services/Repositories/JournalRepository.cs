@@ -571,50 +571,111 @@ namespace EBISX_POS.API.Services.Repositories
 
                 var resetId = isTrainMode ? posInfo.ResetCounterTrainNo : posInfo.ResetCounterNo;
                 var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                var backupDir = "C:\\Backups"; // Make sure this path exists and is writable
+                var backupDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups");
 
-                if (Directory.Exists(backupDir) == false)
+                if (!Directory.Exists(backupDir))
                     Directory.CreateDirectory(backupDir);
 
+                // Get the source database paths
+                var sourceOrderDbPath = _dataContext.Database.GetDbConnection().DataSource;
+                var sourceJournalDbPath = _journal.Database.GetDbConnection().DataSource;
 
-                // Step 1: Export to .sql files
-                await DumpTableToFile("Order", Path.Combine(backupDir, $"Order_Backup_{resetId}_{timestamp}{(isTrainMode ? "_Train" : "")}.sql"));
-                await DumpTableToFile("AccountJournal", Path.Combine(backupDir, $"AccountJournal_Backup_{resetId}_{timestamp}{(isTrainMode ? "_Train" : "")}.sql"));
+                // Create backup database files
+                var orderBackupPath = Path.Combine(backupDir, $"Order_Backup_{resetId}_{timestamp}{(isTrainMode ? "_Train" : "")}.db");
+                var journalBackupPath = Path.Combine(backupDir, $"AccountJournal_Backup_{resetId}_{timestamp}{(isTrainMode ? "_Train" : "")}.db");
 
-                // Step 2: Create backup tables in MySQL
-                var orderBackupTable = $"Order_Backup_{resetId}";
-                var journalBackupTable = $"AccountJournal_Backup_{resetId}";
+                // Backup Order table
+                using (var orderBackupConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={orderBackupPath}"))
+                {
+                    await orderBackupConnection.OpenAsync();
+                    using var orderBackupCommand = orderBackupConnection.CreateCommand();
+                    
+                    // First create the table structure
+                    orderBackupCommand.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS [Order] (
+                            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            InvoiceNumber TEXT,
+                            TotalAmount REAL,
+                            DiscountAmount REAL,
+                            DueAmount REAL,
+                            CashTendered REAL,
+                            VatAmount REAL,
+                            VatExempt REAL,
+                            DiscountType TEXT,
+                            EligibleDiscNames TEXT,
+                            OSCAIdsNum TEXT,
+                            IsTrainMode INTEGER,
+                            IsCancelled INTEGER,
+                            IsReturned INTEGER,
+                            CreatedAt TEXT,
+                            EntryId TEXT
+                        )";
+                    await orderBackupCommand.ExecuteNonQueryAsync();
 
-                var backupOrderSql = $@"
-            CREATE TABLE IF NOT EXISTS `{orderBackupTable}` LIKE `Order`;
-            INSERT INTO `{orderBackupTable}` SELECT * FROM `Order`;
-        ";
+                    // Then copy the data
+                    orderBackupCommand.CommandText = $@"
+                        ATTACH DATABASE '{sourceOrderDbPath}' AS source;
+                        INSERT INTO [Order] 
+                        SELECT * FROM source.[Order];
+                        DETACH DATABASE source;";
+                    await orderBackupCommand.ExecuteNonQueryAsync();
+                }
 
-                var backupJournalSql = $@"
-            CREATE TABLE IF NOT EXISTS `{journalBackupTable}` LIKE `AccountJournal`;
-            INSERT INTO `{journalBackupTable}` SELECT * FROM `AccountJournal`;
-        ";
+                // Backup AccountJournal table
+                using (var journalBackupConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={journalBackupPath}"))
+                {
+                    await journalBackupConnection.OpenAsync();
+                    using var journalBackupCommand = journalBackupConnection.CreateCommand();
+                    
+                    // First create the table structure
+                    journalBackupCommand.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS AccountJournal (
+                            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            EntryNo TEXT,
+                            EntryLineNo INTEGER,
+                            Status TEXT,
+                            EntryName TEXT,
+                            AccountName TEXT,
+                            Description TEXT,
+                            Reference TEXT,
+                            EntryDate TEXT,
+                            Debit REAL,
+                            Credit REAL,
+                            QtyOut REAL,
+                            Price REAL,
+                            Vatable REAL,
+                            SubTotal REAL
+                        )";
+                    await journalBackupCommand.ExecuteNonQueryAsync();
 
-                await _dataContext.Database.ExecuteSqlRawAsync(backupOrderSql);
-                await _journal.Database.ExecuteSqlRawAsync(backupJournalSql);
+                    // Then copy the data
+                    journalBackupCommand.CommandText = $@"
+                        ATTACH DATABASE '{sourceJournalDbPath}' AS source;
+                        INSERT INTO AccountJournal 
+                        SELECT * FROM source.AccountJournal;
+                        DETACH DATABASE source;";
+                    await journalBackupCommand.ExecuteNonQueryAsync();
+                }
 
-                // Step 3: Truncate the original tables
-                var truncateOrderSql = @"
-            SET FOREIGN_KEY_CHECKS = 0;
-            TRUNCATE TABLE `Order`;
-            SET FOREIGN_KEY_CHECKS = 1;
-        ";
+                // Truncate tables
+                using var truncateOrderCommand = _dataContext.Database.GetDbConnection().CreateCommand();
+                truncateOrderCommand.CommandText = "DELETE FROM [Order]";
+                await truncateOrderCommand.ExecuteNonQueryAsync();
 
-                var truncateJournalSql = @"
-            SET FOREIGN_KEY_CHECKS = 0;
-            TRUNCATE TABLE `AccountJournal`;
-            SET FOREIGN_KEY_CHECKS = 1;
-        ";
+                using var truncateJournalCommand = _journal.Database.GetDbConnection().CreateCommand();
+                truncateJournalCommand.CommandText = "DELETE FROM AccountJournal";
+                await truncateJournalCommand.ExecuteNonQueryAsync();
 
-                await _dataContext.Database.ExecuteSqlRawAsync(truncateOrderSql);
-                await _journal.Database.ExecuteSqlRawAsync(truncateJournalSql);
+                // Reset auto-increment counters
+                using var resetOrderCommand = _dataContext.Database.GetDbConnection().CreateCommand();
+                resetOrderCommand.CommandText = "DELETE FROM sqlite_sequence WHERE name='Order'";
+                await resetOrderCommand.ExecuteNonQueryAsync();
 
-                // Step 4: Increment the ResetCounterNo
+                using var resetJournalCommand = _journal.Database.GetDbConnection().CreateCommand();
+                resetJournalCommand.CommandText = "DELETE FROM sqlite_sequence WHERE name='AccountJournal'";
+                await resetJournalCommand.ExecuteNonQueryAsync();
+
+                // Increment the ResetCounterNo
                 if (isTrainMode)
                 {
                     posInfo.ResetCounterTrainNo += 1;
@@ -625,48 +686,15 @@ namespace EBISX_POS.API.Services.Repositories
                 }
                 await _dataContext.SaveChangesAsync();
 
-                return (true, "Order and journal tables backed up, exported, and truncated successfully.");
+                return (true, "Order and journal tables backed up and truncated successfully.");
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to truncate orders");
                 return (false, $"Failed to truncate orders: {ex.Message}");
             }
         }
 
-        private async Task DumpTableToFile(string tableName, string filePath)
-        {
-            // Retrieve the connection string values (consider using IConfiguration for this)
-            var connectionString = "Data Source=localhost;Initial Catalog=ebisx_pos;User ID=root;Password=200303"; // Example, replace with your method to get values
-            var dbSettings = new Dictionary<string, string>();
-            foreach (var item in connectionString.Split(';'))
-            {
-                var keyValue = item.Split('=');
-                if (keyValue.Length == 2)
-                {
-                    dbSettings[keyValue[0].Trim()] = keyValue[1].Trim();
-                }
-            }
-
-            var user = dbSettings["User ID"];
-            var password = dbSettings["Password"];
-            var database = dbSettings["Initial Catalog"];
-
-            // Escape special characters for password and file path
-            var escapedPassword = password.Contains(" ") ? $"\"{password}\"" : password;
-            var escapedFilePath = filePath.Contains(" ") ? $"\"{filePath}\"" : filePath;
-
-            var processStartInfo = new ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/C mysqldump --user={user} --password={escapedPassword} --host=localhost --databases {database} {tableName} > {escapedFilePath}",
-                RedirectStandardOutput = false,
-                UseShellExecute = true,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(processStartInfo);
-            await process.WaitForExitAsync();
-        }
         public async Task<(bool isSuccess, string message)> UnpostPwdScAccountJournal(long orderId, string oscaNum)
         {
             var pwdOrSc = await _journal.AccountJournal

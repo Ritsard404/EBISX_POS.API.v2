@@ -5,6 +5,7 @@ using EBISX_POS.API.Services.DTO.Order;
 using EBISX_POS.API.Services.DTO.Report;
 using EBISX_POS.API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 using System.Globalization;
 using System.Threading;
 
@@ -372,6 +373,7 @@ namespace EBISX_POS.API.Services.Repositories
             var withdrawals = await _dataContext.UserLog
                 .Where(mw => mw.Timestamp == ts)
                 .ToListAsync();
+
             decimal withdrawnAmount = withdrawals.Sum(mw => mw.WithdrawAmount);
 
             // Calculate void and refund amounts in memory
@@ -383,9 +385,6 @@ namespace EBISX_POS.API.Services.Repositories
             // Calculate valid orders total in memory
             decimal validOrdersTotal = orders.Where(o => !o.IsCancelled && !o.IsReturned)
                                            .Sum(o => (o?.CashTendered ?? defaultDecimal) - (o?.ChangeAmount ?? defaultDecimal));
-
-            decimal shortOverDec = openingFundDec + validOrdersTotal
-                                 - ((ts?.CashOutDrawerAmount ?? defaultDecimal) - withdrawnAmount);
 
             // Safe payment processing - moved to memory
             var payments = new Payments
@@ -401,9 +400,12 @@ namespace EBISX_POS.API.Services.Repositories
                     }).ToList()
             };
 
+            decimal shortOverDec = ((openingFundDec + validOrdersTotal) - withdrawnAmount)
+                                 - (ts?.CashOutDrawerAmount ?? defaultDecimal);
+
             var summary = new TransactionSummary
             {
-                CashInDrawer = ((ts?.CashOutDrawerAmount ?? defaultDecimal) - withdrawnAmount)
+                CashInDrawer = (((ts?.CashOutDrawerAmount ?? defaultDecimal) - openingFundDec) - (payments.Cash - withdrawnAmount))
                               .ToString("C", pesoCulture),
                 OtherPayments = payments.OtherPayments
             };
