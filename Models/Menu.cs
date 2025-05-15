@@ -14,8 +14,8 @@ namespace EBISX_POS.API.Models
         public string? MenuImagePath  { get; set; }
         public string? Size { get; set; }
         public bool MenuIsAvailable { get; set; } = true;
-        public bool HasDrink { get; set; } = true;
-        public bool HasAddOn { get; set; } = true;
+        public bool HasDrink { get; set; } = false;
+        public bool HasAddOn { get; set; } = false;
         public bool IsAddOn { get; set; } = false;
         public DrinkType? DrinkType { get; set; }
         public AddOnType? AddOnType { get; set; }
