@@ -827,7 +827,6 @@ namespace EBISX_POS.API.Services.Repositories
                     if (dto.HasDiscount && dto.PromoDiscountAmount <= 0)
                     {
                         // Calculate discount based on the current total of suborders.
-                        // (Be aware that if you add the discount as a suborder, it might affect TotalPrice.)
                         var discountAmount = dto.SubOrders.Sum(s => s.ItemSubTotal) >= 1500
                         ? 250
                         : dto.SubOrders.Sum(s => s.ItemSubTotal) * 0.20m;
