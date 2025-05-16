@@ -408,8 +408,9 @@ namespace EBISX_POS.API.Services.Repositories
 
             var summary = new TransactionSummary
             {
-                CashInDrawer = (((ts?.CashOutDrawerAmount ?? defaultDecimal) - openingFundDec) - (payments.Cash - withdrawnAmount))
-                              .ToString("C", pesoCulture),
+                CashInDrawer = (ts?.CashOutDrawerAmount ?? defaultDecimal).ToString("C", pesoCulture),
+                //CashInDrawer = (((ts?.CashOutDrawerAmount ?? defaultDecimal) - openingFundDec) - (payments.Cash - withdrawnAmount))
+                //              .ToString("C", pesoCulture),
                 OtherPayments = payments.OtherPayments
             };
 
