@@ -102,6 +102,7 @@ namespace EBISX_POS.API.Services.Repositories
 
         public async Task<GetInvoiceDTO> GetInvoiceById(long invId)
         {
+            var pesoCulture = new CultureInfo("en-PH");
             // 1) Load the order, its cashier, items and alternative payments
             var order = await _dataContext.Order
                 .Include(o => o.Cashier)
@@ -157,18 +158,18 @@ namespace EBISX_POS.API.Services.Repositories
                 .ToList(),
 
                 // --- Totals
-                TotalAmount = (order.TotalAmount).ToString("C2"),
-                DiscountAmount = (order.DiscountAmount ?? 0m).ToString("C2"),
-                DueAmount = (order.DueAmount ?? 0m).ToString("C2"),
-                CashTenderAmount = (order.CashTendered ?? 0m).ToString("C2"),
-                TotalTenderAmount = (order.TotalTendered ?? 0m).ToString("C2"),
-                ChangeAmount = (order.ChangeAmount ?? 0m).ToString("C2"),
+                TotalAmount = (order.TotalAmount).ToString("C", pesoCulture),
+                DiscountAmount = (order.DiscountAmount ?? 0m).ToString("C", pesoCulture),
+                DueAmount = (order.DueAmount ?? 0m).ToString("C", pesoCulture),
+                CashTenderAmount = (order.CashTendered ?? 0m).ToString("C", pesoCulture),
+                TotalTenderAmount = (order.TotalTendered ?? 0m).ToString("C", pesoCulture),
+                ChangeAmount = (order.ChangeAmount ?? 0m).ToString("C", pesoCulture),
 
                 // VAT breakdown
-                VatExemptSales = (order.VatExempt ?? 0m).ToString("C2"),
+                VatExemptSales = (order.VatExempt ?? 0m).ToString("C", pesoCulture),
                 VatSales = ((order.TotalAmount - (order.VatAmount ?? 0m)))
-                                      .ToString("C2"),
-                VatAmount = (order.VatAmount ?? 0m).ToString("C2"),
+                                      .ToString("C", pesoCulture),
+                VatAmount = (order.VatAmount ?? 0m).ToString("C", pesoCulture),
 
                 // Other tenders (e.g. gift cert, card, etc.)
                 OtherPayments = order.AlternativePayments
