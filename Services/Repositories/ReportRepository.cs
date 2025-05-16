@@ -368,7 +368,7 @@ namespace EBISX_POS.API.Services.Repositories
 
             // Calculate financials with null protection
             decimal openingFundDec = ts?.CashInDrawerAmount ?? defaultDecimal;
-            
+
             // Move withdrawal calculation to memory
             var withdrawals = await _dataContext.UserLog
                 .Where(mw => mw.Timestamp == ts)
@@ -386,6 +386,12 @@ namespace EBISX_POS.API.Services.Repositories
             decimal validOrdersTotal = orders.Where(o => !o.IsCancelled && !o.IsReturned)
                                            .Sum(o => (o?.CashTendered ?? defaultDecimal) - (o?.ChangeAmount ?? defaultDecimal));
 
+            decimal actualCash = openingFundDec + validOrdersTotal;
+            decimal expectedCash = (ts?.CashOutDrawerAmount ?? defaultDecimal) + withdrawnAmount;
+            decimal shortOverDec = expectedCash - actualCash;
+
+
+
             // Safe payment processing - moved to memory
             var payments = new Payments
             {
@@ -399,9 +405,6 @@ namespace EBISX_POS.API.Services.Repositories
                         Amount = g.Sum(x => x?.Amount ?? defaultDecimal)
                     }).ToList()
             };
-
-            decimal shortOverDec = ((openingFundDec + validOrdersTotal) - withdrawnAmount)
-                                 - (ts?.CashOutDrawerAmount ?? defaultDecimal);
 
             var summary = new TransactionSummary
             {
@@ -548,7 +551,8 @@ namespace EBISX_POS.API.Services.Repositories
 
             decimal expectedCash = openingFund + cashSales;
             decimal actualCash = cashInDrawer + withdrawnAmount;
-            decimal shortOver = actualCash - expectedCash;
+            decimal shortOver = expectedCash - actualCash;
+
 
             var knownDiscountTypes = Enum.GetNames(typeof(DiscountTypeEnum)).ToList();
 
