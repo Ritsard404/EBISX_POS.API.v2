@@ -335,7 +335,7 @@ namespace EBISX_POS.API.Services.Repositories
         {
             var pesoCulture = new CultureInfo("en-PH");
             var defaultDecimal = 0m;
-            var defaultDate = new DateTime(2000, 1, 1);
+            var defaultDate = DateTime.UtcNow;
 
             bool isTrainMode = await _dataContext.PosTerminalInfo
                 .Select(o => o.IsTrainMode)
