@@ -932,7 +932,7 @@ namespace EBISX_POS.API.Services.Repositories
 
         public async Task<(bool, string)> PromoDiscount(string cashierEmail, string managerEmail, string promoCode)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTime.UtcNow;
 
             // Fetch cashier and manager in a single query
             var users = await _dataContext.User
@@ -948,10 +948,12 @@ namespace EBISX_POS.API.Services.Repositories
                 return (false, "Manager not found.");
 
             // Get the valid promo (only available promos that are not expired)
-            var promo = await _dataContext.CouponPromo
-                .FirstOrDefaultAsync(p => p.PromoCode == promoCode
-                                       && p.IsAvailable
-                                       && (p.ExpirationTime == null || p.ExpirationTime > now));
+            var promo = _dataContext.CouponPromo
+             .Where(p => p.PromoCode == promoCode && p.IsAvailable)
+             .AsEnumerable() // Switch to client-side evaluation
+             .Where(p => p.ExpirationTime == null || p.ExpirationTime > now)
+             .FirstOrDefault();
+
 
             if (promo == null)
                 return (false, "Invalid or expired Promo Code.");
