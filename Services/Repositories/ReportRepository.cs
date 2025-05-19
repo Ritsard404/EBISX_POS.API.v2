@@ -146,8 +146,9 @@ namespace EBISX_POS.API.Services.Repositories
 
                     // map every sub‐order into your ItemInfoDTO
                     itemInfos = group.SubOrders?
-                        .Select(s => new ItemInfoDTO
+                        .Select((s, index) => new ItemInfoDTO
                         {
+                            IsFirstItem = index == 0,
                             Description = s.DisplayName,
                             Amount = s.ItemPriceString
                         })

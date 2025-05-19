@@ -45,6 +45,7 @@
 
     public class ItemInfoDTO
     {
+        public bool IsFirstItem { get; set; } = false;
         public string Description { get; set; } = string.Empty; // Default to empty string
         public string Amount { get; set; } = string.Empty; // Default to empty string
     }
