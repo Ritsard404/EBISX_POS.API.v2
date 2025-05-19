@@ -512,7 +512,7 @@ namespace EBISX_POS.API.Services.Repositories
 
         public async Task<(bool, string)> AvailCoupon(string cashierEmail, string managerEmail, string couponCode)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTime.UtcNow;
 
             // Fetch cashier and manager in a single query
             var users = await _dataContext.User
@@ -527,9 +527,12 @@ namespace EBISX_POS.API.Services.Repositories
             if (manager == null)
                 return (false, "Manager not found.");
 
-            var availedCoupon = await _dataContext.CouponPromo
-                .FirstOrDefaultAsync(c => c.CouponCode == couponCode && c.IsAvailable
-                                       && (c.ExpirationTime == null || c.ExpirationTime > now));
+            var availedCoupon = _dataContext.CouponPromo
+             .Where(p => p.CouponCode == couponCode && p.IsAvailable)
+             .AsEnumerable() // Switch to client-side evaluation
+             .Where(p => p.ExpirationTime == null || p.ExpirationTime > now)
+                .FirstOrDefault();
+
             if (availedCoupon == null)
                 return (false, "Invalid/Expired Coupon Code.");
 
