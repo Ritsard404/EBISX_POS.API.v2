@@ -509,7 +509,7 @@ namespace EBISX_POS.API.Services.Repositories
                 .Where(t => t.TsOut.HasValue
                     && t.TsOut.Value.LocalDateTime >= startDate)
                 .SelectMany(t => t.ManagerLog)
-                .Where(mw => mw?.Action == "Withdrawal")
+                .Where(mw => mw?.Action == "Cash Withdrawal")
                 .Sum(mw => mw?.WithdrawAmount ?? defaultDecimal);
 
             var regularOrders = orders.Where(o => !o.IsCancelled && !o.IsReturned).ToList();
@@ -556,7 +556,7 @@ namespace EBISX_POS.API.Services.Repositories
 
             decimal expectedCash = openingFund + cashSales;
             decimal actualCash = cashInDrawer + withdrawnAmount;
-            decimal shortOver = expectedCash - actualCash;
+            decimal shortOver = actualCash - expectedCash; 
 
 
             var knownDiscountTypes = Enum.GetNames(typeof(DiscountTypeEnum)).ToList();
