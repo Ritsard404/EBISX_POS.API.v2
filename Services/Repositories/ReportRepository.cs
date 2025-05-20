@@ -79,7 +79,6 @@ namespace EBISX_POS.API.Services.Repositories
                 .Where(o =>
                     o.CreatedAt >= start &&
                     o.CreatedAt < end &&
-                    !o.IsCancelled &&
                     !o.IsPending &&
                     o.IsTrainMode == isTrainMode)
                 .Select(s => new GetInvoicesDTO
@@ -90,6 +89,7 @@ namespace EBISX_POS.API.Services.Repositories
                     Time = s.CreatedAt.ToString("hh:mm tt"),
                     CashierName = s.Cashier.UserFName + " " + s.Cashier.UserLName,
                     CashierEmail = s.Cashier.UserEmail,
+                    InvoiceStatus= s.IsCancelled ? "Cancelled" : s.IsReturned ? "Returned" : "Paid"
                 })
                 .OrderBy(i => i.InvoiceNum)
                 .ToList();

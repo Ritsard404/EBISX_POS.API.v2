@@ -8,5 +8,6 @@
         public required string Time { get; set; }
         public required string CashierEmail { get; set; }
         public required string CashierName { get; set; }
+        public required string InvoiceStatus { get; set; }
     }
 }
