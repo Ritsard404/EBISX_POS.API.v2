@@ -81,7 +81,6 @@ namespace EBISX_POS.API.Services.Repositories
                     o.CreatedAt < end &&
                     !o.IsCancelled &&
                     !o.IsPending &&
-                    !o.IsReturned &&
                     o.IsTrainMode == isTrainMode)
                 .Select(s => new GetInvoicesDTO
                 {
