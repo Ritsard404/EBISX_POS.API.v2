@@ -427,10 +427,10 @@ namespace EBISX_POS.API.Services.Repositories
 
                 ReportDate = DateTime.Now.ToString("MMMM dd, yyyy", pesoCulture),
                 ReportTime = DateTime.Now.ToString("hh:mm tt", pesoCulture),
-                StartDateTime = firstOrder?.CreatedAt.LocalDateTime.ToString("MM/dd/yy  hh:mm tt", pesoCulture)
-                              ?? defaultDate.ToString("MM/dd/yy  hh:mm tt", pesoCulture),
-                EndDateTime = lastOrder?.CreatedAt.LocalDateTime.ToString("MM/dd/yy  hh:mm tt", pesoCulture)
-                             ?? defaultDate.ToString("MM/dd/yy  hh:mm tt", pesoCulture),
+                StartDateTime = firstOrder?.CreatedAt.LocalDateTime.ToString("MM/dd/yy hh:mm tt", pesoCulture)
+                              ?? defaultDate.ToString("MM/dd/yy hh:mm tt", pesoCulture),
+                EndDateTime = lastOrder?.CreatedAt.LocalDateTime.ToString("MM/dd/yy hh:mm tt", pesoCulture)
+                             ?? defaultDate.ToString("MM/dd/yy hh:mm tt", pesoCulture),
 
                 Cashier = ts?.Cashier != null
                         ? $"{ts.Cashier.UserFName} {ts.Cashier.UserLName}"
@@ -596,8 +596,8 @@ namespace EBISX_POS.API.Services.Repositories
 
                 ReportDate = DateTime.Now.ToString("MMMM dd, yyyy", pesoCulture),
                 ReportTime = DateTime.Now.ToString("hh:mm tt", pesoCulture),
-                StartDateTime = startDate.ToString("MM/dd/yy  hh:mm tt", pesoCulture),
-                EndDateTime = endDate.ToString("MM/dd/yy  hh:mm tt", pesoCulture),
+                StartDateTime = startDate.ToString("MM/dd/yy hh:mm tt", pesoCulture),
+                EndDateTime = endDate.ToString("MM/dd/yy hh:mm tt", pesoCulture),
 
                 // Order numbers
                 BeginningSI = GetOrderNumber(regularOrders.Min(o => o?.Id)),
