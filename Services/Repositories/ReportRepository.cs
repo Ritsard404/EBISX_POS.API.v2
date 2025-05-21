@@ -84,7 +84,7 @@ namespace EBISX_POS.API.Services.Repositories
                 .Select(s => new GetInvoicesDTO
                 {
                     InvoiceNum = s.InvoiceNumber,
-                    InvoiceNumString = s.Id.ToString("D12"),
+                    InvoiceNumString = s.InvoiceNumber.ToString("D12"),
                     Date = s.CreatedAt.ToString("MM/dd/yyyy"),
                     Time = s.CreatedAt.ToString("hh:mm tt"),
                     CashierName = s.Cashier.UserFName + " " + s.Cashier.UserLName,
