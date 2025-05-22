@@ -89,7 +89,7 @@ namespace EBISX_POS.API.Services.Repositories
                     Time = s.CreatedAt.ToString("hh:mm tt"),
                     CashierName = s.Cashier.UserFName + " " + s.Cashier.UserLName,
                     CashierEmail = s.Cashier.UserEmail,
-                    InvoiceStatus= s.IsCancelled ? "Cancelled" : s.IsReturned ? "Returned" : "Paid"
+                    InvoiceStatus = s.IsCancelled ? "Cancelled" : s.IsReturned ? "Returned" : "Paid"
                 })
                 .OrderBy(i => i.InvoiceNum)
                 .ToList();
@@ -435,8 +435,8 @@ namespace EBISX_POS.API.Services.Repositories
                 Cashier = ts?.Cashier != null
                         ? $"{ts.Cashier.UserFName} {ts.Cashier.UserLName}"
                         : "N/A",
-                BeginningOrNumber = firstOrder?.Id.ToString("D12") ?? "N/A",
-                EndingOrNumber = lastOrder?.Id.ToString("D12") ?? "N/A",
+                BeginningOrNumber = firstOrder?.InvoiceNumber.ToString("D12") ?? "N/A",
+                EndingOrNumber = lastOrder?.InvoiceNumber.ToString("D12") ?? "N/A",
 
                 OpeningFund = openingFundDec.ToString("C", pesoCulture),
                 VoidAmount = voidDec.ToString("C", pesoCulture),
@@ -465,8 +465,8 @@ namespace EBISX_POS.API.Services.Repositories
         {
             var pesoCulture = new CultureInfo("en-PH");
             var defaultDecimal = 0m;
-            var defaultDate = new DateTime(2000, 1, 1);
             var today = DateTime.Today;
+            var defaultDate = today;
 
             bool isTrainMode = await _dataContext.PosTerminalInfo
                 .Select(o => o.IsTrainMode)
@@ -507,18 +507,23 @@ namespace EBISX_POS.API.Services.Repositories
             // Withdrawal Amount
             var withdrawnAmount = allTimestamps
                 .Where(t => t.TsOut.HasValue
-                    && t.TsOut.Value.LocalDateTime >= startDate)
+                    && t.TsOut.Value.Date == today)
                 .SelectMany(t => t.ManagerLog)
                 .Where(mw => mw?.Action == "Cash Withdrawal")
                 .Sum(mw => mw?.WithdrawAmount ?? defaultDecimal);
 
-            var regularOrders = orders.Where(o => !o.IsCancelled && !o.IsReturned).ToList();
-            var voidOrders = orders.Where(o => o.IsCancelled).ToList();
-            var returnOrders = orders.Where(o => o.IsReturned).ToList();
+            var allRegularOrders = orders.Where(o => !o.IsCancelled && !o.IsReturned).ToList();
+            var allVoidOrders = orders.Where(o => o.IsCancelled).ToList();
+            var allReturnOrders = orders.Where(o => o.IsReturned).ToList();
+
+            // BREAKDOWN OF SALES
+            var regularOrders = orders.Where(o => !o.IsCancelled && !o.IsReturned && o.CreatedAt.Date == today).ToList();
+            var voidOrders = orders.Where(o => o.IsCancelled && o.CreatedAt.Date == today).ToList();
+            var returnOrders = orders.Where(o => o.IsReturned && o.CreatedAt.Date == today).ToList();
 
             // Accumulated Sales
             decimal previousAccumulatedSales = regularOrders.Where(c => c.CreatedAt.Date < today).Sum(o => o?.TotalAmount ?? defaultDecimal);
-            decimal salesForTheDay = regularOrders.Where(c => c.CreatedAt.Date == today).Sum(o => o?.TotalAmount ?? defaultDecimal);
+            decimal salesForTheDay = regularOrders.Where(c => c.CreatedAt.Date == today).Sum(o => o.TotalAmount - o.DiscountAmount ?? defaultDecimal);
             decimal presentAccumulatedSales = previousAccumulatedSales + salesForTheDay;
 
             // Financial calculations with default values
@@ -541,22 +546,17 @@ namespace EBISX_POS.API.Services.Repositories
             // Cash in Drawer
             decimal cashInDrawer = allTimestamps
                 .Where(t => t.TsOut.HasValue
-                    && t.TsOut.Value.LocalDateTime >= startDate)
+                    && t.TsOut.Value.Date == today)
                 .Sum(s => s.CashOutDrawerAmount) ?? defaultDecimal;
 
             // Opening Fund
             decimal openingFund = allTimestamps
-                .Where(t => t.TsOut.HasValue
-                            && t.TsOut.Value.LocalDateTime >= startDate)
-                // ensure ordering so LastOrDefault() really is the "last"
-                .OrderBy(t => t.TsOut.Value.LocalDateTime)
-                .LastOrDefault()?
-                .CashInDrawerAmount
-                .GetValueOrDefault(defaultDecimal) ?? defaultDecimal;
+                .Where(t => t.TsIn.Value.Date == today)
+                .Sum(s => s.CashInDrawerAmount) ?? defaultDecimal;
 
             decimal expectedCash = openingFund + cashSales;
             decimal actualCash = cashInDrawer + withdrawnAmount;
-            decimal shortOver = actualCash - expectedCash; 
+            decimal shortOver = expectedCash - actualCash;
 
 
             var knownDiscountTypes = Enum.GetNames(typeof(DiscountTypeEnum)).ToList();
@@ -578,7 +578,7 @@ namespace EBISX_POS.API.Services.Repositories
             {
                 Cash = cashSales,
                 OtherPayments = orders
-                .SelectMany(o => o.AlternativePayments != null ? o.AlternativePayments : new List<AlternativePayments>())
+                .SelectMany(o => o.AlternativePayments != null && o.CreatedAt.Date == today ? o.AlternativePayments : new List<AlternativePayments>())
                 .GroupBy(ap => ap.SaleType?.Name ?? "Unknown")
                 .Select(g => new PaymentDetail
                 {
@@ -603,12 +603,12 @@ namespace EBISX_POS.API.Services.Repositories
                 EndDateTime = endDate.ToString("MM/dd/yy hh:mm tt", pesoCulture),
 
                 // Order numbers
-                BeginningSI = GetOrderNumber(regularOrders.Min(o => o?.Id)),
-                EndingSI = GetOrderNumber(regularOrders.Max(o => o?.Id)),
-                BeginningVoid = GetOrderNumber(voidOrders.Min(o => o?.Id)),
-                EndingVoid = GetOrderNumber(voidOrders.Max(o => o?.Id)),
-                BeginningReturn = GetOrderNumber(returnOrders.Min(o => o?.Id)),
-                EndingReturn = GetOrderNumber(returnOrders.Max(o => o?.Id)),
+                BeginningSI = GetOrderNumber(allRegularOrders.Min(o => o?.InvoiceNumber)),
+                EndingSI = GetOrderNumber(allRegularOrders.Max(o => o?.InvoiceNumber)),
+                BeginningVoid = GetOrderNumber(allVoidOrders.Min(o => o?.InvoiceNumber)),
+                EndingVoid = GetOrderNumber(allVoidOrders.Max(o => o?.InvoiceNumber)),
+                BeginningReturn = GetOrderNumber(allReturnOrders.Min(o => o?.InvoiceNumber)),
+                EndingReturn = GetOrderNumber(allReturnOrders.Max(o => o?.InvoiceNumber)),
 
                 // Always zero when empty
                 ResetCounter = isTrainMode ? posInfo.ResetCounterTrainNo.ToString() : posInfo.ResetCounterNo.ToString(),
@@ -635,7 +635,7 @@ namespace EBISX_POS.API.Services.Repositories
 
                 TransactionSummary = new TransactionSummary
                 {
-                    CashInDrawer = cashSales.ToString("C", pesoCulture),
+                    CashInDrawer = cashInDrawer.ToString("C", pesoCulture),
                     OtherPayments = payments.OtherPayments
                 },
 
