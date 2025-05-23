@@ -74,15 +74,23 @@
         public bool IsUpgradeMeal => ItemPrice > 0;
 
         public string ItemPriceString =>
-        IsOtherDisc
-            ? $"{ItemPrice:0}%"                                                   // 1) explicit “other” → percent
-            : (MenuId == null && DrinkId == null && AddOnId == null)
-                ? $" ₱{ItemSubTotal:G29}"                                         // 2) pure‑discount & not other → negative ₱
-                : IsFirstItem
-                    ? $"₱{ItemSubTotal:G29}"                                      // 3) first item → positive ₱
-                    : IsUpgradeMeal
-                        ? $"+ ₱{ItemSubTotal:G29}"                                // 4) upgrade → +₱
-                        : $"- ₱{ItemSubTotal:G29}";                               // 5) catch‑all → -₱
+     // 0) if the item’s price (or its subtotal) is zero, show nothing:
+     (ItemPrice == 0m || ItemSubTotal == 0m)
+         ? string.Empty
+         // 1) explicit “other” → percent
+         : IsOtherDisc
+             ? $"{ItemPrice:0}%"
+             // 2) pure‑discount & not “other” → negative ₱ (only if not zero)
+             : (MenuId == null && DrinkId == null && AddOnId == null)
+                 ? $" ₱{ItemSubTotal:G29}"
+                 // 3) first item → positive ₱
+                 : IsFirstItem
+                     ? $"₱{ItemSubTotal:G29}"
+                     // 4) upgrade → +₱ (only if ItemPrice > 0)
+                     : IsUpgradeMeal
+                         ? $"+ ₱{ItemSubTotal:G29}"
+                         // 5) otherwise (i.e. a non‐first, non‐upgrade) → – ₱
+                         : $"- ₱{ItemSubTotal:G29}";                              // 5) catch‑all → -₱
 
 
 

@@ -83,7 +83,7 @@ namespace EBISX_POS.API.Services.Repositories
                     o.IsTrainMode == isTrainMode)
                 .Select(s => new GetInvoicesDTO
                 {
-                    InvoiceNum = s.Id,
+                    InvoiceNum = s.InvoiceNumber,
                     InvoiceNumString = s.Id.ToString("D12"),
                     Date = s.CreatedAt.ToString("MM/dd/yyyy"),
                     Time = s.CreatedAt.ToString("hh:mm tt"),
@@ -108,7 +108,7 @@ namespace EBISX_POS.API.Services.Repositories
                 .Include(o => o.Items)
                 .Include(o => o.AlternativePayments)
                     .ThenInclude(ap => ap.SaleType)
-                .FirstOrDefaultAsync(o => o.Id == invId);
+                .FirstOrDefaultAsync(o => o.InvoiceNumber == invId);
 
             if (order == null)
                 return new GetInvoiceDTO();
@@ -129,7 +129,7 @@ namespace EBISX_POS.API.Services.Repositories
                 MinNumber = posInfo?.MinNumber ?? "",
 
                 // --- Invoice Header
-                InvoiceNum = order.Id.ToString("D12"),
+                InvoiceNum = order.InvoiceNumber.ToString("D12"),
                 InvoiceDate = order.CreatedAt
                                           .ToString("MM/dd/yyyy HH:mm:ss"),
                 OrderType = order.OrderType,
