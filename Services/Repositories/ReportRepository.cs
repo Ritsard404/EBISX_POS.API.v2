@@ -522,8 +522,8 @@ namespace EBISX_POS.API.Services.Repositories
             var returnOrders = orders.Where(o => o.IsReturned && o.CreatedAt.Date == today).ToList();
 
             // Accumulated Sales
-            decimal previousAccumulatedSales = regularOrders.Where(c => c.CreatedAt.Date < today).Sum(o => o?.TotalAmount ?? defaultDecimal);
             decimal salesForTheDay = regularOrders.Where(c => c.CreatedAt.Date == today).Sum(o => o.TotalAmount - o.DiscountAmount ?? defaultDecimal);
+            decimal previousAccumulatedSales = allRegularOrders.Where(c => c.CreatedAt.Date < today).Sum(o => o.TotalAmount - o.DiscountAmount ?? defaultDecimal);
             decimal presentAccumulatedSales = previousAccumulatedSales + salesForTheDay;
 
             // Financial calculations with default values
