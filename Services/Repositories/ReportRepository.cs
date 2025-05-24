@@ -517,9 +517,9 @@ namespace EBISX_POS.API.Services.Repositories
             var allReturnOrders = orders.Where(o => o.IsReturned).ToList();
 
             // BREAKDOWN OF SALES
-            var regularOrders = orders.Where(o => !o.IsCancelled && !o.IsReturned && o.CreatedAt.Date == today).ToList();
-            var voidOrders = orders.Where(o => o.IsCancelled && o.CreatedAt.Date == today).ToList();
-            var returnOrders = orders.Where(o => o.IsReturned && o.CreatedAt.Date == today).ToList();
+            var regularOrders = allRegularOrders.Where(o => o.CreatedAt.Date == today).ToList();
+            var voidOrders = allVoidOrders.Where(o => o.CreatedAt.Date == today).ToList();
+            var returnOrders = allReturnOrders.Where(o => o.CreatedAt.Date == today).ToList();
 
             // Accumulated Sales
             decimal salesForTheDay = regularOrders.Where(c => c.CreatedAt.Date == today).Sum(o => o.TotalAmount - o.DiscountAmount ?? defaultDecimal);
@@ -554,8 +554,8 @@ namespace EBISX_POS.API.Services.Repositories
                 .Where(t => t.TsIn.Value.Date == today)
                 .Sum(s => s.CashInDrawerAmount) ?? defaultDecimal;
 
-            decimal expectedCash = openingFund + cashSales;
-            decimal actualCash = cashInDrawer + withdrawnAmount;
+            decimal actualCash = openingFund + cashSales;
+            decimal expectedCash = cashInDrawer + withdrawnAmount;
             decimal shortOver = expectedCash - actualCash;
 
 
