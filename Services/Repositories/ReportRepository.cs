@@ -597,11 +597,11 @@ namespace EBISX_POS.API.Services.Repositories
                 .ToString();
 
             decimal otherDiscount = regularOrders
-                .Where(s => !knownDiscountTypes.Contains(s.DiscountType))
+                .Where(s => s.DiscountType != null && !knownDiscountTypes.Contains(s.DiscountType))
                 .Sum(s => s.DiscountAmount) ?? 0m;
 
             string otherCount = regularOrders
-                .Where(s => !knownDiscountTypes.Contains(s.DiscountType))
+                .Where(s => s.DiscountType != null && !knownDiscountTypes.Contains(s.DiscountType))
                 .Count()
                 .ToString();
 
@@ -820,6 +820,104 @@ namespace EBISX_POS.API.Services.Repositories
                     }
                 }
             }
+        }
+
+
+        public async Task<List<AuditTrailDTO>> GetAuditTrail(DateTime fromDate, DateTime toDate)
+        {
+            var auditTrail = new List<AuditTrailDTO>();
+            var startDate = fromDate.Date;
+            var endDate = toDate.Date.AddDays(1);
+            var phCulture = new CultureInfo("en-PH");
+            const string DATE_FORMAT = "MM/dd/yyyy";
+            const string TIME_FORMAT = "hh:mm tt";
+            const string CURRENCY_FORMAT = "₱{0:N2}";
+
+            // Get user logs - this query is fine as is
+            var userLogs = await _dataContext.UserLog
+                .Include(m => m.Cashier)
+                .Include(m => m.Manager)
+                .Where(c => c.CreatedAt >= startDate && c.CreatedAt < endDate)
+                .Select(m => new AuditTrailDTO
+                {
+                    Date = m.CreatedAt.ToLocalTime().ToString(DATE_FORMAT, phCulture),
+                    Time = m.CreatedAt.ToLocalTime().ToString(TIME_FORMAT, phCulture),
+                    UserName = m.Manager != null
+                        ? $"{m.Manager.UserFName} {m.Manager.UserLName}"
+                        : $"{m.Cashier.UserFName} {m.Cashier.UserLName}",
+                    Action = m.Action,
+                    Amount = m.WithdrawAmount > 0
+                        ? string.Format(CURRENCY_FORMAT, m.WithdrawAmount)
+                        : null,
+                    SortDateTime = m.CreatedAt.ToLocalTime()
+                })
+                .ToListAsync();
+
+            auditTrail.AddRange(userLogs);
+
+            // Get all timestamps first, then filter in memory
+            var timestamps = await _dataContext.Timestamp
+                .Include(t => t.Cashier)
+                .Include(t => t.ManagerIn)
+                .Include(t => t.ManagerOut)
+                .ToListAsync();
+
+            // Filter timestamps in memory
+            var filteredTimestamps = timestamps.Where(t =>
+                (t.TsIn.HasValue && t.TsIn.Value.DateTime.Date >= startDate && t.TsIn.Value.DateTime.Date < endDate) ||
+                (t.TsOut.HasValue && t.TsOut.Value.DateTime.Date >= startDate && t.TsOut.Value.DateTime.Date < endDate))
+                .ToList();
+
+            foreach (var t in filteredTimestamps)
+            {
+                // Process TsIn events
+                if (t.TsIn.HasValue)
+                {
+                    var tsInDateTime = t.TsIn.Value;
+                    var action = t.CashInDrawerAmount.HasValue ? "Set Cash in Drawer" : "Log In";
+                    var amount = t.CashInDrawerAmount.HasValue
+                        ? string.Format(CURRENCY_FORMAT, t.CashInDrawerAmount.Value)
+                        : null;
+
+                    auditTrail.Add(new AuditTrailDTO
+                    {
+                        Date = tsInDateTime.ToLocalTime().ToString(DATE_FORMAT, phCulture),
+                        Time = tsInDateTime.ToLocalTime().ToString(TIME_FORMAT, phCulture),
+                        UserName = t.ManagerIn != null
+                            ? $"{t.ManagerIn.UserFName} {t.ManagerIn.UserLName}"
+                            : "Super Admin",
+                        Action = action,
+                        Amount = amount,
+                        SortDateTime = tsInDateTime.LocalDateTime
+                    });
+                }
+
+                // Process TsOut events
+                if (t.TsOut.HasValue)
+                {
+                    var tsOutDateTime = t.TsOut.Value;
+                    var manager = t.ManagerOut ?? t.ManagerIn;
+                    var action = t.CashOutDrawerAmount.HasValue ? "Set Cash out Drawer" : "Log Out";
+                    var amount = t.CashOutDrawerAmount.HasValue
+                        ? string.Format(CURRENCY_FORMAT, t.CashOutDrawerAmount.Value)
+                        : null;
+
+                    auditTrail.Add(new AuditTrailDTO
+                    {
+                        Date = tsOutDateTime.ToLocalTime().ToString(DATE_FORMAT, phCulture),
+                        Time = tsOutDateTime.ToLocalTime().ToString(TIME_FORMAT, phCulture),
+                        UserName = manager != null
+                            ? $"{manager.UserFName} {manager.UserLName}"
+                            : "Super Admin",
+                        Action = action,
+                        Amount = amount,
+                        SortDateTime = tsOutDateTime.LocalDateTime
+                    });
+                }
+            }
+
+            // Return sorted by date/time
+            return auditTrail.OrderBy(a => a.SortDateTime).ToList();
         }
 
 
