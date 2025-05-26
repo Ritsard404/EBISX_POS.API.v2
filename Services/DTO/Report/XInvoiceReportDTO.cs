@@ -21,12 +21,15 @@ namespace EBISX_POS.API.Services.DTO.Report
         public required string Cashier { get; set; }
         public required string BeginningOrNumber { get; set; }
         public required string EndingOrNumber { get; set; }
+        public required string TransactCount { get; set; }
 
         public required string OpeningFund { get; set; }
 
         public required Payments Payments { get; set; }
         public required string VoidAmount { get; set; }
+        public required string VoidCount { get; set; }
         public required string Refund { get; set; }
+        public required string RefundCount { get; set; }
         public required string Withdrawal { get; set; }
 
         public required TransactionSummary TransactionSummary { get; set; }

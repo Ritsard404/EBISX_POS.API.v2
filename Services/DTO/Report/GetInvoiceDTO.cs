@@ -35,6 +35,7 @@
         public string PosSerialNumber { get; set; } = string.Empty; // Default to empty string
         public string DateIssued { get; set; } = string.Empty; // Default to empty string
         public string ValidUntil { get; set; } = string.Empty; // Default to empty string
+        public string PrintCount { get; set; } = string.Empty; // Default to empty string
     }
 
     public class ItemDTO

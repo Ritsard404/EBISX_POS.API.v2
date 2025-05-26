@@ -121,6 +121,10 @@ namespace EBISX_POS.API.Services.Repositories
 
             var discountValue = order.DiscountAmount ?? 0m;
 
+            order.PrintCount += 1;
+
+            await _dataContext.SaveChangesAsync();
+
             // 3) Map to your DTO
             var dto = new GetInvoiceDTO
             {
@@ -196,7 +200,8 @@ namespace EBISX_POS.API.Services.Repositories
                 // --- POS Details
                 PosSerialNumber = posInfo?.PosSerialNumber ?? "",
                 DateIssued = posInfo?.DateIssued.ToString("MM/dd/yyyy") ?? "",
-                ValidUntil = posInfo?.ValidUntil.ToString("MM/dd/yyyy") ?? ""
+                ValidUntil = posInfo?.ValidUntil.ToString("MM/dd/yyyy") ?? "",
+                PrintCount = order.PrintCount.ToString(),
             };
 
             return dto;
@@ -372,6 +377,7 @@ namespace EBISX_POS.API.Services.Repositories
             // Handle empty orders scenario
             var firstOrder = orders.FirstOrDefault();
             var lastOrder = orders.LastOrDefault();
+            var orderCount = orders.Count().ToString();
 
             // Calculate financials with null protection
             decimal openingFundDec = ts?.CashInDrawerAmount ?? defaultDecimal;
@@ -386,8 +392,11 @@ namespace EBISX_POS.API.Services.Repositories
             // Calculate void and refund amounts in memory
             decimal voidDec = orders.Where(o => o.IsCancelled)
                                   .Sum(o => o?.TotalAmount ?? defaultDecimal);
+            string voidCount = orders.Count(o => o.IsCancelled).ToString();
+
             decimal refundDec = orders.Where(o => o.IsReturned)
                                     .Sum(o => o?.TotalAmount ?? defaultDecimal);
+            string refundCount = orders.Count(o => o.IsReturned).ToString();
 
             // Calculate valid orders total in memory
             decimal validOrdersTotal = orders.Where(o => !o.IsCancelled && !o.IsReturned)
@@ -408,8 +417,8 @@ namespace EBISX_POS.API.Services.Repositories
                     .GroupBy(ap => ap.SaleType?.Name ?? "Unknown")
                     .Select(g => new PaymentDetail
                     {
-                        Name = g.Key,
-                        Amount = g.Sum(x => x?.Amount ?? defaultDecimal)
+                        Name = g.Key + $"({g.Count()}) :",
+                        Amount = g.Sum(x => x?.Amount ?? defaultDecimal),
                     }).ToList()
             };
 
@@ -443,10 +452,13 @@ namespace EBISX_POS.API.Services.Repositories
                         : "N/A",
                 BeginningOrNumber = firstOrder?.InvoiceNumber.ToString("D12") ?? "N/A",
                 EndingOrNumber = lastOrder?.InvoiceNumber.ToString("D12") ?? "N/A",
+                TransactCount = orderCount,
 
                 OpeningFund = openingFundDec.ToString("C", pesoCulture),
                 VoidAmount = voidDec.ToString("C", pesoCulture),
+                VoidCount = voidCount,
                 Refund = refundDec.ToString("C", pesoCulture),
+                RefundCount = refundCount,
                 Withdrawal = withdrawnAmount.ToString("C", pesoCulture),
 
                 Payments = payments,
@@ -571,13 +583,28 @@ namespace EBISX_POS.API.Services.Repositories
                 .Where(s => s.DiscountType == DiscountTypeEnum.Senior.ToString())
                 .Sum(s => s.DiscountAmount) ?? 0m;
 
+            string seniorCount = regularOrders
+                .Where(s => s.DiscountType == DiscountTypeEnum.Senior.ToString())
+                .Count()
+                .ToString();
+
             decimal pwdDiscount = regularOrders
                 .Where(s => s.DiscountType == DiscountTypeEnum.Pwd.ToString())
                 .Sum(s => s.DiscountAmount) ?? 0m;
 
+            string pwdCount = regularOrders
+                .Where(s => s.DiscountType == DiscountTypeEnum.Pwd.ToString())
+                .Count()
+                .ToString();
+
             decimal otherDiscount = regularOrders
                 .Where(s => !knownDiscountTypes.Contains(s.DiscountType))
                 .Sum(s => s.DiscountAmount) ?? 0m;
+
+            string otherCount = regularOrders
+                .Where(s => !knownDiscountTypes.Contains(s.DiscountType))
+                .Count()
+                .ToString();
 
             // Safe payment processing
             var payments = new Payments
@@ -588,8 +615,8 @@ namespace EBISX_POS.API.Services.Repositories
                 .GroupBy(ap => ap.SaleType?.Name ?? "Unknown")
                 .Select(g => new PaymentDetail
                 {
-                    Name = g.Key,
-                    Amount = g.Sum(x => x.Amount)
+                    Name = g.Key + $"({g.Count()}):",
+                    Amount = g.Sum(x => x.Amount),
                 }).ToList()
             };
 
@@ -615,6 +642,7 @@ namespace EBISX_POS.API.Services.Repositories
                 EndingVoid = GetOrderNumber(allVoidOrders.Max(o => o?.InvoiceNumber)),
                 BeginningReturn = GetOrderNumber(allReturnOrders.Min(o => o?.InvoiceNumber)),
                 EndingReturn = GetOrderNumber(allReturnOrders.Max(o => o?.InvoiceNumber)),
+                TransactCount = orders.Count().ToString(),
 
                 // Always zero when empty
                 ResetCounter = isTrainMode ? posInfo.ResetCounterTrainNo.ToString() : posInfo.ResetCounterNo.ToString(),
@@ -648,14 +676,19 @@ namespace EBISX_POS.API.Services.Repositories
                 DiscountSummary = new DiscountSummary
                 {
                     SeniorCitizen = seniorDiscount.ToString("C", pesoCulture),
+                    SeniorCitizenCount = seniorCount,
                     PWD = pwdDiscount.ToString("C", pesoCulture),
-                    Other = otherDiscount.ToString("C", pesoCulture)
+                    PWDCount = pwdCount,
+                    Other = otherDiscount.ToString("C", pesoCulture),
+                    OtherCount = otherCount
                 },
 
                 SalesAdjustment = new SalesAdjustment
                 {
                     Return = totalReturns.ToString("C", pesoCulture),
+                    ReturnCount = returnOrders.Count().ToString(),
                     Void = totalVoid.ToString("C", pesoCulture),
+                    VoidCount = voidOrders.Count().ToString(),
                 },
 
                 VatAdjustment = new VatAdjustment

@@ -33,6 +33,7 @@ namespace EBISX_POS.API.Models
         public int? EligiblePwdScCount { get; set; }
         public string? EligibleDiscNames { get; set; }
         public string? OSCAIdsNum { get; set; }
+        public int PrintCount { get; set; } = 0;
         public ICollection<CouponPromo> Coupon { get; set; } = new List<CouponPromo>();
         public CouponPromo? Promo { get; set; }
 

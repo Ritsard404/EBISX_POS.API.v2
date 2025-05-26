@@ -12,6 +12,7 @@ namespace EBISX_POS.API.Services.DTO.Report
         public required string VatRegTin { get; set; }
         public required string Min { get; set; }
         public required string SerialNumber { get; set; }
+        public required string TransactCount { get; set; }
 
         // Report Info
         public required string ReportDate { get; set; }
@@ -70,14 +71,19 @@ namespace EBISX_POS.API.Services.DTO.Report
     public class DiscountSummary
     {
         public required string SeniorCitizen { get; set; }
+        public required string SeniorCitizenCount { get; set; }
         public required string PWD { get; set; }
+        public required string PWDCount { get; set; }
         public required string Other { get; set; }
+        public required string OtherCount { get; set; }
     }
 
     public class SalesAdjustment
     {
         public required string Void { get; set; }
+        public required string VoidCount { get; set; }
         public required string Return { get; set; }
+        public required string ReturnCount { get; set; }
     }
 
     public class VatAdjustment
