@@ -29,18 +29,13 @@ namespace EBISX_POS.API.Services.Interfaces
         // Menu CRUD Operations
         Task<(bool isSuccess, string message)> AddMenu(Menu menu, string managerEmail);
         Task<List<Menu>> GetAllMenus();
-        Task<Menu?> GetMenuById(int id);
         Task<(bool isSuccess, string message)> UpdateMenu(Menu menu, string managerEmail);
         Task<(bool isSuccess, string message)> DeleteMenu(int id, string managerEmail);
-        Task<(bool isSuccess, string message)> UpdateMenuImage(int id, string imagePath, string managerEmail);
 
         // Coupon and Promo Operations
         Task<(bool isSuccess, string message, List<CouponPromo> couponPromos)> AddCouponPromo(CouponPromo couponPromo, string managerEmail);
         Task<List<CouponPromo>> GetAllCouponPromos();
-        Task<CouponPromo?> GetCouponPromoById(int id);
-        Task<CouponPromo?> GetCouponPromoByCode(string code);
         Task<(bool isSuccess, string message)> UpdateCouponPromo(CouponPromo couponPromo, string managerEmail);
         Task<(bool isSuccess, string message)> DeleteCouponPromo(int id, string managerEmail);
-        Task<(bool isSuccess, string message)> ValidateCouponPromo(string code, List<Menu> selectedMenus);
     }
 }

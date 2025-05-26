@@ -16,11 +16,6 @@ namespace EBISX_POS.API.Services.Repositories
             _logger = logger;
         }
 
-        public Task<(bool, string)> FetchSaleTypes()
-        {
-            throw new NotImplementedException();
-        }
-
         public async Task<(bool IsSuccess, string Message)> SetPosTerminalInfo(PosTerminalInfo posTerminalInfo)
         {
             if (posTerminalInfo is null)
@@ -61,10 +56,6 @@ namespace EBISX_POS.API.Services.Repositories
                 _logger.LogError(ex, "Unexpected error saving POS terminal info");
                 return (false, "An unexpected error occurred.");
             }
-        }
-        public Task<(bool, string)> FetchUsers()
-        {
-            throw new NotImplementedException();
         }
 
         public async Task<PosTerminalInfo> PosTerminalInfo()

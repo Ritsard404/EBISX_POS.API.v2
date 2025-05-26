@@ -4,9 +4,6 @@ using EBISX_POS.API.Models.Journal;
 using EBISX_POS.API.Services.DTO.Journal;
 using EBISX_POS.API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.Collections.ObjectModel;
-using System.Diagnostics;
 
 namespace EBISX_POS.API.Services.Repositories
 {
@@ -551,243 +548,157 @@ namespace EBISX_POS.API.Services.Repositories
         {
             try
             {
-                bool isTrainMode = await _dataContext.PosTerminalInfo
-                    .Select(o => o.IsTrainMode)
-                    .FirstOrDefaultAsync();
+                // 1) Fetch PosTerminalInfo
+                var posInfo = await _dataContext.PosTerminalInfo.FirstOrDefaultAsync();
+                if (posInfo == null)
+                    return (false, "POS Terminal Info not found");
 
-                var posInfo = await _dataContext.PosTerminalInfo.FirstOrDefaultAsync() ?? new PosTerminalInfo
-                {
-                    RegisteredName = "N/A",
-                    OperatedBy = "N/A",
-                    Address = "N/A",
-                    VatTinNumber = "N/A",
-                    MinNumber = "N/A",
-                    PosSerialNumber = "N/A",
-                    AccreditationNumber = "N/A",
-                    DateIssued = DateTime.Now,
-                    PtuNumber = "N/A",
-                    ValidUntil = DateTime.Now
-                };
-
-                var resetId = isTrainMode ? posInfo.ResetCounterTrainNo : posInfo.ResetCounterNo;
+                var isTrain = posInfo.IsTrainMode;
+                var resetId = isTrain ? posInfo.ResetCounterTrainNo : posInfo.ResetCounterNo;
                 var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+                // 2) Build backup paths & copy files
                 var backupDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups");
+                Directory.CreateDirectory(backupDir);
 
-                if (!Directory.Exists(backupDir))
-                    Directory.CreateDirectory(backupDir);
+                var orderDbPath = _dataContext.Database.GetDbConnection().DataSource;
+                var journalDbPath = _journal.Database.GetDbConnection().DataSource;
 
-                // Get the source database paths
-                var sourceOrderDbPath = _dataContext.Database.GetDbConnection().DataSource;
-                var sourceJournalDbPath = _journal.Database.GetDbConnection().DataSource;
+                var suffix = isTrain ? "_Train" : "";
+                var orderBackupPath = Path.Combine(backupDir, $"Order_{resetId}_{timestamp}{suffix}.db");
+                var journalBackupPath = Path.Combine(backupDir, $"Journal_{resetId}_{timestamp}{suffix}.db");
 
-                // Create backup database files
-                var orderBackupPath = Path.Combine(backupDir, $"Order_Backup_{resetId}_{timestamp}{(isTrainMode ? "_Train" : "")}.db");
-                var journalBackupPath = Path.Combine(backupDir, $"AccountJournal_Backup_{resetId}_{timestamp}{(isTrainMode ? "_Train" : "")}.db");
+                if (File.Exists(orderDbPath))
+                    File.Copy(orderDbPath, orderBackupPath, overwrite: true);
+                if (File.Exists(journalDbPath))
+                    File.Copy(journalDbPath, journalBackupPath, overwrite: true);
 
-                // Backup Order table
-                using (var orderBackupConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={orderBackupPath}"))
+                // 3) Delete data from both databases in the correct order
+                // First, handle the Journal database
+                using (var journalTrans = await _journal.Database.BeginTransactionAsync())
                 {
-                    await orderBackupConnection.OpenAsync();
-                    using var orderBackupCommand = orderBackupConnection.CreateCommand();
-                    
-                    // First create the table structure
-                    orderBackupCommand.CommandText = @"
-                        CREATE TABLE IF NOT EXISTS [Order] (
-                            Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            InvoiceNumber INTEGER NOT NULL,
-                            OrderType TEXT NOT NULL,
-                            TotalAmount REAL NOT NULL,
-                            CashTendered REAL,
-                            DueAmount REAL,
-                            TotalTendered REAL,
-                            ChangeAmount REAL,
-                            VatSales REAL,
-                            VatExempt REAL,
-                            VatAmount REAL,
-                            CreatedAt TEXT NOT NULL,
-                            IsCancelled INTEGER NOT NULL DEFAULT 0,
-                            IsReturned INTEGER NOT NULL DEFAULT 0,
-                            IsRead INTEGER NOT NULL DEFAULT 0,
-                            IsTrainMode INTEGER NOT NULL DEFAULT 0,
-                            IsPending INTEGER NOT NULL DEFAULT 1,
-                            DiscountType TEXT,
-                            DiscountAmount REAL,
-                            DiscountPercent INTEGER,
-                            EligiblePwdScCount INTEGER,
-                            EligibleDiscNames TEXT,
-                            OSCAIdsNum TEXT,
-                            CashierId INTEGER,
-                            EntryId TEXT
-                        )";
-                    await orderBackupCommand.ExecuteNonQueryAsync();
-
-                    // Then copy the data
-                    orderBackupCommand.CommandText = $@"
-                        ATTACH DATABASE '{sourceOrderDbPath}' AS source;
-                        INSERT INTO [Order] 
-                        SELECT * FROM source.[Order];
-                        DETACH DATABASE source;";
-                    await orderBackupCommand.ExecuteNonQueryAsync();
+                    try
+                    {
+                        await _journal.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF;");
+                        await _journal.Database.ExecuteSqlRawAsync("DELETE FROM AccountJournal;");
+                        await _journal.Database.ExecuteSqlRawAsync("DELETE FROM sqlite_sequence WHERE name = 'AccountJournal';");
+                        await _journal.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = ON;");
+                        
+                        await _journal.SaveChangesAsync();
+                        await journalTrans.CommitAsync();
+                        
+                        _logger.LogInformation("Successfully truncated Journal database");
+                    }
+                    catch (Exception ex)
+                    {
+                        await journalTrans.RollbackAsync();
+                        throw new Exception($"Failed to truncate Journal database: {ex.Message}", ex);
+                    }
                 }
 
-                // Backup AccountJournal table
-                using (var journalBackupConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={journalBackupPath}"))
+                // Then, handle the Order database
+                using (var orderTrans = await _dataContext.Database.BeginTransactionAsync())
                 {
-                    await journalBackupConnection.OpenAsync();
-                    using var journalBackupCommand = journalBackupConnection.CreateCommand();
-                    
-                    // First create the table structure
-                    journalBackupCommand.CommandText = @"
-                        CREATE TABLE IF NOT EXISTS AccountJournal (
-                            unique_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            Entry_Type TEXT NOT NULL DEFAULT '',
-                            Entry_No INTEGER,
-                            Entry_Line_No INTEGER DEFAULT 0,
-                            Entry_Date TEXT NOT NULL DEFAULT '2001-01-01',
-                            Entry_Name TEXT NOT NULL DEFAULT '',
-                            group_id TEXT NOT NULL DEFAULT '',
-                            AccountName TEXT NOT NULL DEFAULT '',
-                            Description TEXT NOT NULL DEFAULT '',
-                            Reference TEXT NOT NULL DEFAULT '',
-                            Branch TEXT NOT NULL DEFAULT '',
-                            TerminalNo INTEGER DEFAULT 0,
-                            Debit REAL DEFAULT 0,
-                            Credit REAL DEFAULT 0,
-                            AccountBalance REAL DEFAULT 0,
-                            Status TEXT NOT NULL DEFAULT '',
-                            cleared TEXT NOT NULL DEFAULT '',
-                            clearingref INTEGER DEFAULT 0,
-                            costcenter TEXT NOT NULL DEFAULT '',
-                            accountno TEXT NOT NULL DEFAULT '',
-                            costcenterdesc TEXT NOT NULL DEFAULT '',
-                            linetype TEXT NOT NULL DEFAULT '',
-                            linetype_transno INTEGER DEFAULT 0,
-                            ItemID TEXT NOT NULL DEFAULT '',
-                            ItemDesc TEXT,
-                            Unit TEXT NOT NULL DEFAULT '',
-                            QtyIn REAL DEFAULT 0,
-                            QtyOut REAL DEFAULT 0,
-                            QtyPerBaseUnit REAL DEFAULT 1,
-                            QtyBalanceInBaseUnit REAL DEFAULT 0,
-                            Cost REAL DEFAULT 0,
-                            Price REAL DEFAULT 0,
-                            Discrate REAL DEFAULT 0,
-                            Discamt REAL DEFAULT 0,
-                            TotalCost REAL DEFAULT 0,
-                            TotalPrice REAL DEFAULT 0,
-                            received REAL DEFAULT 0,
-                            delivered REAL NOT NULL DEFAULT 0,
-                            tax_id TEXT NOT NULL DEFAULT '',
-                            tax_account TEXT NOT NULL DEFAULT '',
-                            tax_type TEXT NOT NULL DEFAULT '',
-                            tax_rate REAL DEFAULT 0,
-                            tax_total REAL DEFAULT 0,
-                            sub_total REAL DEFAULT 0,
-                            serial TEXT,
-                            chassis TEXT NOT NULL DEFAULT '',
-                            engine TEXT NOT NULL DEFAULT '',
-                            itemtype TEXT NOT NULL DEFAULT '',
-                            serialstatus INTEGER DEFAULT 0,
-                            expirydate TEXT NOT NULL DEFAULT '2001-01-01',
-                            batchno TEXT NOT NULL DEFAULT '',
-                            itemcolor TEXT NOT NULL DEFAULT '',
-                            converted INTEGER DEFAULT 0,
-                            vattype TEXT NOT NULL DEFAULT '',
-                            vatable REAL DEFAULT 0,
-                            exempt REAL DEFAULT 0,
-                            nonvatable REAL DEFAULT 0,
-                            zerorated REAL DEFAULT 0,
-                            income_account TEXT NOT NULL DEFAULT '',
-                            cogs_account TEXT NOT NULL DEFAULT '',
-                            inventory_account TEXT NOT NULL DEFAULT '',
-                            job_no TEXT,
-                            job_desc TEXT NOT NULL DEFAULT '',
-                            name_type TEXT NOT NULL DEFAULT '',
-                            docref TEXT NOT NULL DEFAULT '',
-                            name_desc TEXT NOT NULL DEFAULT '',
-                            length REAL DEFAULT 0.00,
-                            width REAL DEFAULT 0.00,
-                            area REAL DEFAULT 0.00,
-                            perimeter REAL DEFAULT 0.00,
-                            principal REAL DEFAULT 0,
-                            interest REAL DEFAULT 0,
-                            penalty REAL DEFAULT 0,
-                            total_loan_amount REAL DEFAULT 0,
-                            penalty_rate REAL DEFAULT 0,
-                            penalty_term REAL DEFAULT 0,
-                            requested REAL DEFAULT 0.00,
-                            entry_time TEXT,
-                            entry_id TEXT NOT NULL DEFAULT '',
-                            entry_status TEXT NOT NULL DEFAULT '',
-                            entry_type TEXT NOT NULL DEFAULT '',
-                            entry_name TEXT NOT NULL DEFAULT '',
-                            entry_date TEXT NOT NULL DEFAULT '',
-                            entry_time_zone TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_offset TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_id TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_name TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_abbreviation TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_display_name TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_standard_name TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_daylight_name TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_supports_daylight_saving_time INTEGER NOT NULL DEFAULT 0,
-                            entry_time_zone_base_utc_offset TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_adjustment_rules TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_has_inconsistent_rules INTEGER NOT NULL DEFAULT 0,
-                            entry_time_zone_supports_daylight_saving_time_2 INTEGER NOT NULL DEFAULT 0,
-                            entry_time_zone_base_utc_offset_2 TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_adjustment_rules_2 TEXT NOT NULL DEFAULT '',
-                            entry_time_zone_has_inconsistent_rules_2 INTEGER NOT NULL DEFAULT 0
-                        )";
-                    await journalBackupCommand.ExecuteNonQueryAsync();
+                    try
+                    {
+                        // Log counts before deletion
+                        var beforeCounts = new
+                        {
+                            Items = await _dataContext.Item.CountAsync(),
+                            UserLogs = await _dataContext.UserLog.CountAsync(),
+                            AltPayments = await _dataContext.AlternativePayments.CountAsync(),
+                            Timestamps = await _dataContext.Timestamp.CountAsync(),
+                            Orders = await _dataContext.Order.CountAsync()
+                        };
+                        _logger.LogInformation("Before deletion counts: {@Counts}", beforeCounts);
 
-                    // Then copy the data
-                    journalBackupCommand.CommandText = $@"
-                        ATTACH DATABASE '{sourceJournalDbPath}' AS source;
-                        INSERT INTO AccountJournal 
-                        SELECT * FROM source.AccountJournal;
-                        DETACH DATABASE source;";
-                    await journalBackupCommand.ExecuteNonQueryAsync();
+                        // Disable foreign keys and triggers
+                        await _dataContext.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF;");
+                        await _dataContext.Database.ExecuteSqlRawAsync("PRAGMA triggers = OFF;");
+
+                        // Delete in correct order based on dependencies
+                        var deleteOrder = new[]
+                        {
+                            // First, delete all dependent records
+                            "AlternativePayments",    // Depends on Order and SaleType
+                            "Item",                   // Depends on Order, Menu, Drink, AddOn
+                            "UserLog",               // Depends on Timestamp, User
+                            "Timestamp",             // Depends on User
+                            //"CouponPromo",           // Depends on Order
+                            
+                            //// Then, delete the main tables
+                            //"Menu",                  // Depends on Category, AddOnType, DrinkType
+                            //"SaleType",              // Independent table
+                            //"DrinkType",             // Independent table
+                            //"AddOnType",             // Independent table
+                            //"Category",              // Independent table
+                            
+                            // Finally, delete the parent table
+                            "Order"                // Parent table
+                        };
+
+                        foreach (var table in deleteOrder)
+                        {
+                            _logger.LogInformation("Deleting all records from table: {Table}", table);
+                            await _dataContext.Database.ExecuteSqlRawAsync($"DELETE FROM [{table}];");
+                        }
+
+                        // Reset all auto-increment counters
+                        await _dataContext.Database.ExecuteSqlRawAsync(@"
+                            DELETE FROM sqlite_sequence 
+                            WHERE name IN (
+                                'AlternativePayments', 'Item', 'UserLog', 'Timestamp', 
+                                'CouponPromo', 'Menu', 'SaleType', 'DrinkType', 
+                                'AddOnType', 'Category', 'Order'
+                            );
+                        ");
+
+                        // Re-enable foreign keys and triggers
+                        await _dataContext.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = ON;");
+                        await _dataContext.Database.ExecuteSqlRawAsync("PRAGMA triggers = ON;");
+
+                        await _dataContext.SaveChangesAsync();
+                        await orderTrans.CommitAsync();
+
+                        // Log counts after deletion
+                        var afterCounts = new
+                        {
+                            Items = await _dataContext.Item.CountAsync(),
+                            UserLogs = await _dataContext.UserLog.CountAsync(),
+                            AltPayments = await _dataContext.AlternativePayments.CountAsync(),
+                            Timestamps = await _dataContext.Timestamp.CountAsync(),
+                            Orders = await _dataContext.Order.CountAsync()
+                        };
+                        _logger.LogInformation("After deletion counts: {@Counts}", afterCounts);
+                    }
+                    catch (Exception ex)
+                    {
+                        await orderTrans.RollbackAsync();
+                        throw new Exception($"Failed to truncate Order database: {ex.Message}", ex);
+                    }
                 }
 
-                // Truncate tables
-                using var truncateOrderCommand = _dataContext.Database.GetDbConnection().CreateCommand();
-                truncateOrderCommand.CommandText = "DELETE FROM [Order]";
-                await truncateOrderCommand.ExecuteNonQueryAsync();
-
-                using var truncateJournalCommand = _journal.Database.GetDbConnection().CreateCommand();
-                truncateJournalCommand.CommandText = "DELETE FROM AccountJournal";
-                await truncateJournalCommand.ExecuteNonQueryAsync();
-
-                // Reset auto-increment counters
-                using var resetOrderCommand = _dataContext.Database.GetDbConnection().CreateCommand();
-                resetOrderCommand.CommandText = "DELETE FROM sqlite_sequence WHERE name='Order'";
-                await resetOrderCommand.ExecuteNonQueryAsync();
-
-                using var resetJournalCommand = _journal.Database.GetDbConnection().CreateCommand();
-                resetJournalCommand.CommandText = "DELETE FROM sqlite_sequence WHERE name='AccountJournal'";
-                await resetJournalCommand.ExecuteNonQueryAsync();
-
-                // Increment the ResetCounterNo
-                if (isTrainMode)
-                {
-                    posInfo.ResetCounterTrainNo += 1;
-                }
+                // 4) Update reset counter
+                if (isTrain)
+                    posInfo.ResetCounterTrainNo++;
                 else
-                {
-                    posInfo.ResetCounterNo += 1;
-                }
+                    posInfo.ResetCounterNo++;
+
                 await _dataContext.SaveChangesAsync();
 
-                return (true, "Order and journal tables backed up and truncated successfully.");
+                _logger.LogInformation(
+                    "Successfully truncated databases. New reset counter: {ResetCounter} (Train mode: {IsTrain})",
+                    isTrain ? posInfo.ResetCounterTrainNo : posInfo.ResetCounterNo,
+                    isTrain);
+
+                return (true, "Successfully truncated and backed up all databases.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to truncate orders");
-                return (false, $"Failed to truncate orders: {ex.Message}");
+                _logger.LogError(ex, "Error during database truncation");
+                return (false, $"Truncation failed: {ex.Message}");
             }
         }
-
         public async Task<(bool isSuccess, string message)> UnpostPwdScAccountJournal(long orderId, string oscaNum)
         {
             var pwdOrSc = await _journal.AccountJournal

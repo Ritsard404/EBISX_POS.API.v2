@@ -775,23 +775,7 @@ namespace EBISX_POS.API.Services.Repositories
             }
         }
 
-        public async Task<Menu?> GetMenuById(int id)
-        {
-            try
-            {
-                return await _dataContext.Menu
-                    .Include(m => m.Category)
-                    .Include(m => m.DrinkType)
-                    .Include(m => m.AddOnType)
-                    .FirstOrDefaultAsync(m => m.Id == id);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving menu");
-                return null;
-            }
-        }
-
+      
         public async Task<(bool isSuccess, string message)> UpdateMenu(Menu menu, string managerEmail)
         {
             try
@@ -920,44 +904,6 @@ namespace EBISX_POS.API.Services.Repositories
             }
         }
 
-        public async Task<(bool isSuccess, string message)> UpdateMenuImage(int id, string imagePath, string managerEmail)
-        {
-            try
-            {
-                // Validate manager
-                var manager = await ValidateManager(managerEmail);
-                if (manager == null)
-                {
-                    return (false, "Unauthorized: Invalid manager credentials");
-                }
-
-                // Get menu
-                var menu = await _dataContext.Menu.FindAsync(id);
-                if (menu == null)
-                {
-                    return (false, "Menu not found");
-                }
-
-                // Update image path
-                menu.MenuImagePath = imagePath;
-
-                // Log the action
-                _dataContext.UserLog.Add(new UserLog
-                {
-                    Manager = manager,
-                    Action = $"Updated menu image: {menu.MenuName}",
-                    CreatedAt = DateTime.UtcNow
-                });
-
-                await _dataContext.SaveChangesAsync();
-                return (true, "Menu image updated successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating menu image");
-                return (false, "An error occurred while updating the menu image");
-            }
-        }
         #endregion
 
         #region Coupon and Promo Operations
@@ -1059,36 +1005,6 @@ namespace EBISX_POS.API.Services.Repositories
             {
                 _logger.LogError(ex, "Error retrieving coupon promos");
                 return new List<CouponPromo>();
-            }
-        }
-
-        public async Task<CouponPromo?> GetCouponPromoById(int id)
-        {
-            try
-            {
-                return await _dataContext.CouponPromo
-                    .Include(cp => cp.CouponMenus)
-                    .FirstOrDefaultAsync(cp => cp.Id == id);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving coupon promo");
-                return null;
-            }
-        }
-
-        public async Task<CouponPromo?> GetCouponPromoByCode(string code)
-        {
-            try
-            {
-                return await _dataContext.CouponPromo
-                    .Include(cp => cp.CouponMenus)
-                    .FirstOrDefaultAsync(cp => cp.PromoCode == code || cp.CouponCode == code);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving coupon promo by code");
-                return null;
             }
         }
 
@@ -1222,56 +1138,6 @@ namespace EBISX_POS.API.Services.Repositories
             }
         }
 
-        public async Task<(bool isSuccess, string message)> ValidateCouponPromo(string code, List<Menu> selectedMenus)
-        {
-            try
-            {
-                var couponPromo = await _dataContext.CouponPromo
-                    .Include(cp => cp.CouponMenus)
-                    .FirstOrDefaultAsync(cp => cp.PromoCode == code || cp.CouponCode == code);
-
-                if (couponPromo == null)
-                {
-                    return (false, "Invalid code");
-                }
-
-                if (couponPromo.ExpirationTime <= DateTimeOffset.UtcNow)
-                {
-                    return (false, "Code has expired");
-                }
-
-                // For promos (percentage discounts), no menu validation needed
-                if (!string.IsNullOrEmpty(couponPromo.PromoCode))
-                {
-                    return (true, "Valid promo code");
-                }
-
-                // For coupons, validate selected menus
-                if (couponPromo.CouponMenus != null && couponPromo.CouponMenus.Any())
-                {
-                    var validMenus = selectedMenus
-                        .Where(m => couponPromo.CouponMenus.Any(cm => cm.Id == m.Id))
-                        .ToList();
-
-                    if (!validMenus.Any())
-                    {
-                        return (false, "No valid menu items selected for this coupon");
-                    }
-
-                    if (validMenus.Count < couponPromo.CouponItemQuantity)
-                    {
-                        return (false, $"Minimum {couponPromo.CouponItemQuantity} items required for this coupon");
-                    }
-                }
-
-                return (true, "Valid coupon code");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error validating coupon/promo");
-                return (false, "An error occurred while validating the code");
-            }
-        }
         #endregion
 
         #region Helper Methods

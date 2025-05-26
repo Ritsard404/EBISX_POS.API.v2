@@ -33,28 +33,6 @@ namespace EBISX_POS.API.Controllers
         }
 
         /// <summary>
-        /// Gets a menu by ID
-        /// </summary>
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetMenuById(int id)
-        {
-            try
-            {
-                var menu = await _menu.GetMenuById(id);
-                if (menu == null)
-                {
-                    return NotFound(new { message = "Menu not found" });
-                }
-                return Ok(menu);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving menu");
-                return StatusCode(500, new { message = "An error occurred while retrieving the menu" });
-            }
-        }
-
-        /// <summary>
         /// Adds a new menu
         /// </summary>
         [HttpPost]
@@ -120,27 +98,6 @@ namespace EBISX_POS.API.Controllers
             }
         }
 
-        /// <summary>
-        /// Updates a menu's image
-        /// </summary>
-        [HttpPut("{id}/image")]
-        public async Task<IActionResult> UpdateMenuImage(int id, [FromBody] string imagePath, [FromQuery] string managerEmail)
-        {
-            try
-            {
-                var (isSuccess, message) = await _menu.UpdateMenuImage(id, imagePath, managerEmail);
-                if (!isSuccess)
-                {
-                    return BadRequest(new { message });
-                }
-                return Ok(new { message });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating menu image");
-                return StatusCode(500, new { message = "An error occurred while updating the menu image" });
-            }
-        }
         #endregion
 
         #region Menu Operations
@@ -495,50 +452,6 @@ namespace EBISX_POS.API.Controllers
         }
 
         /// <summary>
-        /// Get coupon promo by ID
-        /// </summary>
-        [HttpGet("coupon-promos/{id}")]
-        public async Task<IActionResult> GetCouponPromoById(int id)
-        {
-            try
-            {
-                var couponPromo = await _menu.GetCouponPromoById(id);
-                if (couponPromo == null)
-                {
-                    return NotFound("Coupon/Promo not found");
-                }
-                return Ok(couponPromo);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving coupon promo");
-                return StatusCode(500, "An error occurred while retrieving the coupon promo");
-            }
-        }
-
-        /// <summary>
-        /// Get coupon promo by code
-        /// </summary>
-        [HttpGet("coupon-promos/code/{code}")]
-        public async Task<IActionResult> GetCouponPromoByCode(string code)
-        {
-            try
-            {
-                var couponPromo = await _menu.GetCouponPromoByCode(code);
-                if (couponPromo == null)
-                {
-                    return NotFound("Coupon/Promo not found");
-                }
-                return Ok(couponPromo);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving coupon promo");
-                return StatusCode(500, "An error occurred while retrieving the coupon promo");
-            }
-        }
-
-        /// <summary>
         /// Add new coupon promo
         /// </summary>
         [HttpPost("coupon-promos")]
@@ -619,33 +532,6 @@ namespace EBISX_POS.API.Controllers
             }
         }
 
-        /// <summary>
-        /// Validate coupon promo code
-        /// </summary>
-        [HttpPost("coupon-promos/validate")]
-        public async Task<IActionResult> ValidateCouponPromo([FromBody] ValidateCouponPromoRequest request)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(request.Code))
-                {
-                    return BadRequest("Code is required");
-                }
-
-                if (request.SelectedMenus == null || !request.SelectedMenus.Any())
-                {
-                    return BadRequest("Selected menus are required");
-                }
-
-                var (isSuccess, message) = await _menu.ValidateCouponPromo(request.Code, request.SelectedMenus);
-                return Ok(new { isSuccess, message });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error validating coupon promo");
-                return StatusCode(500, "An error occurred while validating the coupon promo");
-            }
-        }
         #endregion
     }
 }
