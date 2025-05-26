@@ -244,10 +244,14 @@ namespace EBISX_POS.API.Services.Repositories
                         u.UserRole == "Cashier" &&
                         u.IsActive);
             }
+            var hasMenu = await _dataContext.Menu.AnyAsync(i => i.MenuIsAvailable);
+
+            if (!hasMenu)
+                return (false, false, "", "");
 
             // If neither found, fail
             if (manager == null && cashier == null)
-                return (false, false, "", "");
+                return (false, false, "", "No menu is available. Cannot proceed with the transaction.");
 
             // --- Manager-only login (no cashierEmail supplied) ---
             if (cashier == null)
