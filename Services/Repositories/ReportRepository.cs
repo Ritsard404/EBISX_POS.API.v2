@@ -177,8 +177,7 @@ namespace EBISX_POS.API.Services.Repositories
 
                 // VAT breakdown
                 VatExemptSales = (order.VatExempt ?? 0m).ToString("C", pesoCulture),
-                VatSales = ((order.TotalAmount - (order.VatAmount ?? 0m)))
-                                      .ToString("C", pesoCulture),
+                VatSales = (order.VatSales ?? 0m).ToString("C", pesoCulture),
                 VatAmount = (order.VatAmount ?? 0m).ToString("C", pesoCulture),
 
                 // Other tenders (e.g. gift cert, card, etc.)
@@ -271,7 +270,7 @@ namespace EBISX_POS.API.Services.Repositories
                     {
                         // Calculate discount based on the current total of suborders.
                         // (Be aware that if you add the discount as a suborder, it might affect TotalPrice.)
-                        var discountAmount = dto.SubOrders.Sum(s => s.ItemSubTotal) >= 250
+                        var discountAmount = dto.SubOrders.Sum(s => s.ItemSubTotal) >= 1250
                         ? 250
                         : dto.SubOrders.Sum(s => s.ItemSubTotal) * 0.20m;
 
