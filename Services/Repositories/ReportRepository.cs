@@ -417,7 +417,7 @@ namespace EBISX_POS.API.Services.Repositories
                     .GroupBy(ap => ap.SaleType?.Name ?? "Unknown")
                     .Select(g => new PaymentDetail
                     {
-                        Name = g.Key + $"({g.Count()}) :",
+                        Name = g.Key + $" ({g.Count()}) :",
                         Amount = g.Sum(x => x?.Amount ?? defaultDecimal),
                     }).ToList()
             };
@@ -615,7 +615,7 @@ namespace EBISX_POS.API.Services.Repositories
                 .GroupBy(ap => ap.SaleType?.Name ?? "Unknown")
                 .Select(g => new PaymentDetail
                 {
-                    Name = g.Key + $"({g.Count()}):",
+                    Name = g.Key + $" ({g.Count()}):",
                     Amount = g.Sum(x => x.Amount),
                 }).ToList()
             };
