@@ -3,14 +3,8 @@ using EBISX_POS.API.Models;
 using EBISX_POS.API.Models.Utils;
 using EBISX_POS.API.Services.DTO.Journal;
 using EBISX_POS.API.Services.DTO.Order;
-using EBISX_POS.API.Services.DTO.Report;
 using EBISX_POS.API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Identity.Client;
-using System.Collections.ObjectModel;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading;
 
 namespace EBISX_POS.API.Services.Repositories
 {
