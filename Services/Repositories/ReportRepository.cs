@@ -89,7 +89,7 @@ namespace EBISX_POS.API.Services.Repositories
                     Time = s.CreatedAt.ToString("hh:mm tt"),
                     CashierName = s.Cashier.UserFName + " " + s.Cashier.UserLName,
                     CashierEmail = s.Cashier.UserEmail,
-                    InvoiceStatus = s.IsCancelled ? "Cancelled" : s.IsReturned ? "Returned" : "Paid"
+                    InvoiceStatus = s.IsCancelled ? "Cancelled" : s.IsReturned ? "Refund" : "Paid"
                 })
                 .OrderBy(i => i.InvoiceNum)
                 .ToList();
@@ -118,6 +118,8 @@ namespace EBISX_POS.API.Services.Repositories
             // 2) Load your POS terminal / business info (assumes a single row)
             var posInfo = await _dataContext.Set<PosTerminalInfo>()
                 .FirstOrDefaultAsync();
+
+            var discountValue = order.DiscountAmount ?? 0m;
 
             // 3) Map to your DTO
             var dto = new GetInvoiceDTO
@@ -157,9 +159,13 @@ namespace EBISX_POS.API.Services.Repositories
                 })
                 .ToList(),
 
+
+
                 // --- Totals
                 TotalAmount = (order.TotalAmount).ToString("C", pesoCulture),
-                DiscountAmount = (order.DiscountAmount ?? 0m).ToString("C", pesoCulture),
+                DiscountAmount = discountValue != 0m
+                      ? "-" + discountValue.ToString("C", pesoCulture)
+                      : discountValue.ToString("C", pesoCulture),
                 DueAmount = (order.DueAmount ?? 0m).ToString("C", pesoCulture),
                 CashTenderAmount = (order.CashTendered ?? 0m).ToString("C", pesoCulture),
                 TotalTenderAmount = (order.TotalTendered ?? 0m).ToString("C", pesoCulture),
