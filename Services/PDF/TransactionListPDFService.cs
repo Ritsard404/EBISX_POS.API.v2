@@ -44,7 +44,7 @@ namespace EBISX_POS.API.Services.PDF
             var phCulture = new CultureInfo("en-PH");
 
             // Fonts
-            var titleFont = new XFont("Arial", 14, XFontStyle.Bold);
+            var titleFont = new XFont("Arial", 16, XFontStyle.Bold);
             var headerFont = new XFont("Arial", 10, XFontStyle.Bold);
             var normalFont = new XFont("Arial", 9, XFontStyle.Regular);
             var smallFont = new XFont("Arial", 8, XFontStyle.Regular);
@@ -55,13 +55,13 @@ namespace EBISX_POS.API.Services.PDF
             double pageWidth = page.Width - margin * 2;
 
             // Header
-            gfx.DrawString(_businessName, titleFont, XBrushes.Black, new XPoint(margin, y));
+            gfx.DrawString(_businessName, titleFont, XBrushes.DarkBlue, new XPoint(margin, y));
             y += 18;
             gfx.DrawString(_address, normalFont, XBrushes.Black, new XPoint(margin, y));
             y += 12;
             gfx.DrawString($"TIN {_tin}", normalFont, XBrushes.Black, new XPoint(margin, y));
             y += 18;
-            gfx.DrawString("DAILY TRANSACTION LIST", headerFont, XBrushes.Black, new XPoint(margin, y));
+            gfx.DrawString("DAILY TRANSACTION LIST", headerFont, XBrushes.DarkBlue, new XPoint(margin, y));
             y += 14;
             gfx.DrawString($"From {fromDate:MM-dd-yyyy} To {toDate:MM-dd-yyyy}", normalFont, XBrushes.Black, new XPoint(margin, y));
             y += 18;

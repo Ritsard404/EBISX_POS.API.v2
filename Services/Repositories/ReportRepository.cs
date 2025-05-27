@@ -877,14 +877,18 @@ namespace EBISX_POS.API.Services.Repositories
                 // Generate PDF
                 var pdfBytes = _auditTrailPDFService.GenerateAuditTrailPDF(auditTrail, fromDate, toDate);
 
-                // Create filename with date range
-                var fileName = $"AuditTrail_{fromDate:yyyyMMdd}_to_{toDate:yyyyMMdd}.pdf";
-                var filePath = Path.Combine(folderPath, fileName);
+                // BASE name (no suffix):
+                var baseName = $"AuditTrail_{fromDate:yyyyMMdd}_to_{toDate:yyyyMMdd}";
+
+                // Append a timestamp so it’s always unique
+                var uniqueSuffix = DateTime.Now.ToString("yyyyMMddHHmmssfff");
+                var fileName = $"{baseName}_{uniqueSuffix}.pdf";
 
                 // Ensure directory exists
                 if (!Directory.Exists(folderPath))
                     Directory.CreateDirectory(folderPath);
 
+                var filePath = Path.Combine(folderPath, fileName);
                 // Save PDF file
                 await File.WriteAllBytesAsync(filePath, pdfBytes);
 
@@ -908,13 +912,21 @@ namespace EBISX_POS.API.Services.Repositories
                 // Generate PDF
                 var pdfBytes = _transactionListPDFService.GenerateTransactionListPDF(transactions, fromDate, toDate);
 
-                // Create filename with date range
-                var fileName = $"TransactionList_{fromDate:yyyy-MM-dd}_to_{toDate:yyyy-MM-dd}.pdf";
-                var filePath = Path.Combine(folderPath, fileName);
+
+                // BASE name (no suffix):
+                var baseName = $"TranxList_{fromDate:yyyyMMdd}_to_{toDate:yyyyMMdd}";
+
+                // Append a timestamp so it’s always unique
+                var uniqueSuffix = DateTime.Now.ToString("yyyyMMddHHmmssfff");
+                var fileName = $"{baseName}_{uniqueSuffix}.pdf";
 
                 // Ensure directory exists
-                if(!Directory.Exists(folderPath))
+                if (!Directory.Exists(folderPath))
                     Directory.CreateDirectory(folderPath);
+
+                var filePath = Path.Combine(folderPath, fileName);
+                // Save PDF file
+                await File.WriteAllBytesAsync(filePath, pdfBytes);
 
                 // Save PDF file
                 await File.WriteAllBytesAsync(filePath, pdfBytes);
