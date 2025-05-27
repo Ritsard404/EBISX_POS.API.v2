@@ -20,6 +20,7 @@ namespace EBISX_POS.API.Models
         public decimal? VatExempt { get; set; }
         public decimal? VatAmount { get; set; }
         public required DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+        public DateTimeOffset? StatusChangeDate { get; set; }
 
         public bool IsCancelled { get; set; } = false;
         public bool IsReturned { get; set; } = false;

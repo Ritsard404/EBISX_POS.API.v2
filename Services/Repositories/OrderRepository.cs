@@ -472,6 +472,7 @@ namespace EBISX_POS.API.Services.Repositories
             // Cancel the order
             currentOrder.IsPending = false;
             currentOrder.IsCancelled = true;
+            currentOrder.StatusChangeDate = DateTime.Now;
             currentOrder.UserLog ??= new List<UserLog>();
             currentOrder.UserLog.Add(new UserLog
             {
@@ -1022,7 +1023,6 @@ namespace EBISX_POS.API.Services.Repositories
             return (true, $"{promo.PromoAmount}");
         }
 
-
         public async Task<(bool, string)> VoidOrderItem(VoidOrderItemDTO voidOrder)
         {
             // Fetch cashier and manager in a single query
@@ -1196,19 +1196,18 @@ namespace EBISX_POS.API.Services.Repositories
                 .FirstOrDefaultAsync(o => o.InvoiceNumber == invoiceNumber);
 
             if (orderToRefund == null)
-            {
                 return (false, "Order not found.");
-            }
+            
 
             if (orderToRefund.IsReturned)
-            {
                 return (false, "Order has already been returned.");
-            }
+            
 
             if (orderToRefund.IsCancelled)
-            {
                 return (false, "Cannot refund a cancelled order.");
-            }
+            
+            if (DateTimeOffset.Now - orderToRefund.CreatedAt > TimeSpan.FromDays(1))
+                return (false, "Refund period has expired (more than 1 day since purchase).");
 
             // Check if the current training mode matches the order's training mode
             var currentTrainMode = await _auth.IsTrainMode();
@@ -1218,6 +1217,7 @@ namespace EBISX_POS.API.Services.Repositories
             }
 
             orderToRefund.IsReturned = true;
+            orderToRefund.StatusChangeDate = DateTime.Now;
             orderToRefund.UserLog ??= new List<UserLog>();
             orderToRefund.UserLog.Add(new UserLog
             {

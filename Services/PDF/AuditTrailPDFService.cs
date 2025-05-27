@@ -14,11 +14,11 @@ namespace EBISX_POS.API.Services.PDF
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         }
 
-        private readonly string _businessName;
-        private readonly string _address;
-        private readonly string _vatTinNumber;
-        private readonly string _minNumber;
-        private readonly string _serialNumber;
+        private string _businessName;
+        private string _address;
+        private string _vatTinNumber;
+        private string _minNumber;
+        private string _serialNumber;
         private PdfDocument _document;
 
         // Font settings
@@ -39,7 +39,17 @@ namespace EBISX_POS.API.Services.PDF
         private const double TABLE_ROW_HEIGHT = 20;
         private const double TABLE_CELL_PADDING = 5;
 
-        public AuditTrailPDFService(string businessName, string address, string vatTinNumber, string minNumber, string serialNumber)
+        public AuditTrailPDFService()
+        {
+            // Initialize with default values
+            _businessName = "N/A";
+            _address = "N/A";
+            _vatTinNumber = "N/A";
+            _minNumber = "N/A";
+            _serialNumber = "N/A";
+        }
+
+        public void UpdateBusinessInfo(string businessName, string address, string vatTinNumber, string minNumber, string serialNumber)
         {
             _businessName = businessName;
             _address = address;

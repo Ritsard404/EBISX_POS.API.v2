@@ -72,63 +72,103 @@ namespace EBISX_POS.API.Controllers
         {
             return Ok(await _report.UserActionLog(isManagerLog, fromDate, toDate));
         }
-        [HttpGet]
-        public async Task<IActionResult> GetAuditTrail(DateTime fromDate, DateTime toDate)
-        {
-            return Ok(await _report.GetAuditTrail(fromDate, toDate));
-        }
+        //    [HttpGet]
+        //    public async Task<IActionResult> GetAuditTrail(DateTime fromDate, DateTime toDate)
+        //    {
+        //        return Ok(await _report.GetAuditTrail(fromDate, toDate));
+        //    }
 
-        [HttpGet("audit-trail-pdf")]
-        public async Task<IActionResult> GetAuditTrailPDF(DateTime fromDate, DateTime toDate)
-        {
-            try
-            {
-                // Get audit trail data
-                var auditTrail = await _report.GetAuditTrail(fromDate, toDate);
+        //    [HttpGet]
+        //    public async Task<IActionResult> GetTransactList(DateTime fromDate, DateTime toDate)
+        //    {
+        //        var (list, total) = await _report.GetTransactList(fromDate, toDate);
+        //        return Ok(new { list , total});
+        //    }
 
-                // Get POS terminal info
-                var posInfo = await _dataContext.PosTerminalInfo.FirstOrDefaultAsync() ?? new PosTerminalInfo
-                {
-                    RegisteredName = "N/A",
-                    OperatedBy = "N/A",
-                    Address = "N/A",
-                    VatTinNumber = "N/A",
-                    MinNumber = "N/A",
-                    PosSerialNumber = "N/A",
-                    AccreditationNumber = "N/A",
-                    DateIssued = DateTime.Now,
-                    PtuNumber = "N/A",
-                    ValidUntil = DateTime.Now
-                };
+        //    [HttpGet("audit-trail-pdf")]
+        //    public async Task<IActionResult> GetAuditTrailPDF(DateTime fromDate, DateTime toDate)
+        //    {
+        //        try
+        //        {
+        //            // Get audit trail data
+        //            var auditTrail = await _report.GetAuditTrail(fromDate, toDate);
 
-                // Generate PDF
-                var pdfService = new AuditTrailPDFService(
-                    posInfo.RegisteredName,
-                    posInfo.Address,
-                    posInfo.VatTinNumber,
-                    posInfo.MinNumber,
-                    posInfo.PosSerialNumber
-                );
+        //            // Get POS terminal info
+        //            var posInfo = await _dataContext.PosTerminalInfo.FirstOrDefaultAsync() ?? new PosTerminalInfo
+        //            {
+        //                RegisteredName = "N/A",
+        //                OperatedBy = "N/A",
+        //                Address = "N/A",
+        //                VatTinNumber = "N/A",
+        //                MinNumber = "N/A",
+        //                PosSerialNumber = "N/A",
+        //                AccreditationNumber = "N/A",
+        //                DateIssued = DateTime.Now,
+        //                PtuNumber = "N/A",
+        //                ValidUntil = DateTime.Now
+        //            };
 
-                var pdfBytes = pdfService.GenerateAuditTrailPDF(auditTrail, fromDate, toDate);
-                var fileName = $"AuditTrail_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}.pdf";
-                var filePath = Path.Combine(_pdfStoragePath, fileName);
+        //            // Generate PDF
+        //            var pdfService = new AuditTrailPDFService(
+        //                posInfo.RegisteredName,
+        //                posInfo.Address,
+        //                posInfo.VatTinNumber,
+        //                posInfo.MinNumber,
+        //                posInfo.PosSerialNumber
+        //            );
 
-                // Save the PDF to the local directory
-                await System.IO.File.WriteAllBytesAsync(filePath, pdfBytes);
+        //            var pdfBytes = pdfService.GenerateAuditTrailPDF(auditTrail, fromDate, toDate);
+        //            var fileName = $"AuditTrail_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}.pdf";
+        //            var filePath = Path.Combine(_pdfStoragePath, fileName);
 
-                // Return both the file path and a success message
-                return Ok(new 
-                { 
-                    message = "PDF generated and saved successfully",
-                    filePath = filePath,
-                    fileName = fileName
-                });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
+        //            // Save the PDF to the local directory
+        //            await System.IO.File.WriteAllBytesAsync(filePath, pdfBytes);
+
+        //            // Return both the file path and a success message
+        //            return Ok(new 
+        //            { 
+        //                message = "PDF generated and saved successfully",
+        //                filePath = filePath,
+        //                fileName = fileName
+        //            });
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            return BadRequest(new { message = ex.Message });
+        //        }
+        //    }
+
+        //    [HttpGet("transaction-list-pdf")]
+        //    public async Task<IActionResult> GetTransactionListPDF(DateTime fromDate, DateTime toDate)
+        //    {
+        //        // Get transaction data
+        //        var (transactions, _) = await _report.GetTransactList(fromDate, toDate);
+
+        //        // Get POS terminal info for header
+        //        var posInfo = await _dataContext.PosTerminalInfo.FirstOrDefaultAsync() ?? new PosTerminalInfo
+        //        {
+        //            RegisteredName = "N/A",
+        //            OperatedBy = "N/A",
+        //            Address = "N/A",
+        //            VatTinNumber = "N/A",
+        //            MinNumber = "N/A",
+        //            PosSerialNumber = "N/A",
+        //            AccreditationNumber = "N/A",
+        //            DateIssued = DateTime.Now,
+        //            PtuNumber = "N/A",
+        //            ValidUntil = DateTime.Now
+        //        };
+
+        //        // Generate PDF
+        //        var pdfService = new TransactionListPDFService(
+        //            posInfo.RegisteredName,
+        //            posInfo.Address,
+        //            posInfo.VatTinNumber
+        //        );
+        //        var pdfBytes = pdfService.GenerateTransactionListPDF(transactions, fromDate, toDate);
+
+        //        var fileName = $"TransactionList_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}.pdf";
+        //        return File(pdfBytes, "application/pdf", fileName);
+        //    }
     }
 }

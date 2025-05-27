@@ -8,11 +8,54 @@ using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Globalization;
 using System.Threading;
+using System.IO;
+using EBISX_POS.API.Services.PDF;
 
 namespace EBISX_POS.API.Services.Repositories
 {
-    public class ReportRepository(DataContext _dataContext, IAuth _auth) : IReport
+    public class ReportRepository : IReport
     {
+        private readonly DataContext _dataContext;
+        private readonly IAuth _auth;
+        private readonly AuditTrailPDFService _auditTrailPDFService;
+        private readonly TransactionListPDFService _transactionListPDFService;
+
+        public ReportRepository(
+            DataContext dataContext, 
+            IAuth auth, 
+            AuditTrailPDFService auditTrailPDFService, 
+            TransactionListPDFService transactionListPDFService)
+        {
+            _dataContext = dataContext;
+            _auth = auth;
+            _auditTrailPDFService = auditTrailPDFService;
+            _transactionListPDFService = transactionListPDFService;
+        }
+
+        private async Task InitializePDFServices()
+        {
+            var posInfo = await _dataContext.PosTerminalInfo.FirstOrDefaultAsync();
+            if (posInfo == null)
+            {
+                throw new InvalidOperationException("POS terminal information not configured");
+            }
+
+            // Update PDF services with business info
+            _auditTrailPDFService.UpdateBusinessInfo(
+                posInfo.RegisteredName ?? "N/A",
+                posInfo.Address ?? "N/A",
+                posInfo.VatTinNumber ?? "N/A",
+                posInfo.MinNumber ?? "N/A",
+                posInfo.PosSerialNumber ?? "N/A"
+            );
+
+            _transactionListPDFService.UpdateBusinessInfo(
+                posInfo.RegisteredName ?? "N/A",
+                posInfo.Address ?? "N/A",
+                posInfo.VatTinNumber ?? "N/A"
+            );
+        }
+
         public async Task<(string CashInDrawer, string CurrentCashDrawer)> CashTrack(string cashierEmail)
         {
             // First get the timestamp
@@ -823,7 +866,70 @@ namespace EBISX_POS.API.Services.Repositories
         }
 
 
-        public async Task<List<AuditTrailDTO>> GetAuditTrail(DateTime fromDate, DateTime toDate)
+        public async Task<(List<AuditTrailDTO> Data, string FilePath)> GetAuditTrail(DateTime fromDate, DateTime toDate, string folderPath)
+        {
+            try
+            {
+                await InitializePDFServices();
+                // Get the audit trail data
+                var auditTrail = await GetAuditTrailData(fromDate, toDate);
+
+                // Generate PDF
+                var pdfBytes = _auditTrailPDFService.GenerateAuditTrailPDF(auditTrail, fromDate, toDate);
+
+                // Create filename with date range
+                var fileName = $"AuditTrail_{fromDate:yyyyMMdd}_to_{toDate:yyyyMMdd}.pdf";
+                var filePath = Path.Combine(folderPath, fileName);
+
+                // Ensure directory exists
+                if (!Directory.Exists(folderPath))
+                    Directory.CreateDirectory(folderPath);
+
+                // Save PDF file
+                await File.WriteAllBytesAsync(filePath, pdfBytes);
+
+                return (auditTrail, filePath);
+            }
+            catch (Exception ex)
+            {
+                // Log the error appropriately
+                throw new Exception($"Error generating audit trail report: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<(List<TransactionListDTO> Data, TotalTransactionListDTO Totals, string FilePath)> GetTransactList(DateTime fromDate, DateTime toDate, string folderPath)
+        {
+            try
+            {
+                await InitializePDFServices();
+                // Get the transaction list data
+                var (transactions, totals) = await GetTransactListData(fromDate, toDate);
+
+                // Generate PDF
+                var pdfBytes = _transactionListPDFService.GenerateTransactionListPDF(transactions, fromDate, toDate);
+
+                // Create filename with date range
+                var fileName = $"TransactionList_{fromDate:yyyy-MM-dd}_to_{toDate:yyyy-MM-dd}.pdf";
+                var filePath = Path.Combine(folderPath, fileName);
+
+                // Ensure directory exists
+                if(!Directory.Exists(folderPath))
+                    Directory.CreateDirectory(folderPath);
+
+                // Save PDF file
+                await File.WriteAllBytesAsync(filePath, pdfBytes);
+
+                return (transactions, totals, filePath);
+            }
+            catch (Exception ex)
+            {
+                // Log the error appropriately
+                throw new Exception($"Error generating transaction list report: {ex.Message}", ex);
+            }
+        }
+
+        // Private helper methods to separate data retrieval from PDF generation
+        private async Task<List<AuditTrailDTO>> GetAuditTrailData(DateTime fromDate, DateTime toDate)
         {
             var auditTrail = new List<AuditTrailDTO>();
             var startDate = fromDate.Date;
@@ -833,7 +939,7 @@ namespace EBISX_POS.API.Services.Repositories
             const string TIME_FORMAT = "hh:mm tt";
             const string CURRENCY_FORMAT = "₱{0:N2}";
 
-            // Get user logs - this query is fine as is
+            // Get user logs
             var userLogs = await _dataContext.UserLog
                 .Include(m => m.Cashier)
                 .Include(m => m.Manager)
@@ -855,7 +961,7 @@ namespace EBISX_POS.API.Services.Repositories
 
             auditTrail.AddRange(userLogs);
 
-            // Get all timestamps first, then filter in memory
+            // Get timestamps
             var timestamps = await _dataContext.Timestamp
                 .Include(t => t.Cashier)
                 .Include(t => t.ManagerIn)
@@ -916,10 +1022,150 @@ namespace EBISX_POS.API.Services.Repositories
                 }
             }
 
-            // Return sorted by date/time
             return auditTrail.OrderBy(a => a.SortDateTime).ToList();
         }
 
+        private async Task<(List<TransactionListDTO>, TotalTransactionListDTO)> GetTransactListData(DateTime fromDate, DateTime toDate)
+        {
+            // Set start date to beginning of day and end date to end of day
+            var startDate = fromDate.Date;
+            var endDate = toDate.Date.AddDays(1).AddTicks(-1);
+
+            var isTrainMode = await _auth.IsTrainMode();
+
+            // Get all orders with necessary includes
+            var orders = _dataContext.Order
+                .Include(o => o.Items)
+                .Include(o => o.Cashier)
+                .Where(o => o.IsTrainMode == isTrainMode)
+                .AsEnumerable()
+                .Where(o => o.CreatedAt.DateTime >= startDate && o.CreatedAt.DateTime <= endDate)
+                .OrderBy(o => o.InvoiceNumber)
+                .ToList();
+
+            var transactionList = new List<TransactionListDTO>();
+            var totalTransactionList = new TotalTransactionListDTO();
+
+            foreach (var order in orders)
+            {
+                // Calculate base amounts and round to 2 decimal places
+                var subTotal = Math.Round(order.TotalAmount, 2);
+                var amountDue = Math.Round(order.DueAmount ?? 0m, 2);
+                var grossSales = Math.Round(subTotal, 2);
+                var returns = 0m;
+                var lessDiscount = Math.Round(order.DiscountAmount ?? 0m, 2);
+                var netOfSales = Math.Round(subTotal - lessDiscount, 2);
+                var vatable = Math.Round(order.VatSales ?? 0m, 2);
+                var zeroRated = 0m;
+                var exempt = Math.Round(order.VatExempt ?? 0m, 2);
+                var vat = Math.Round(order.VatAmount ?? 0m, 2);
+
+                // Create initial transaction entry
+                var baseTransaction = new TransactionListDTO
+                {
+                    Date = order.CreatedAt.ToString("MM/dd/yyyy"),
+                    InvoiceNum = order.InvoiceNumber.ToString("D12"),
+                    Src = "",
+                    DiscType = order.DiscountType ?? "",
+                    Percent = order.DiscountPercent?.ToString() ?? "",
+                    SubTotal = subTotal,
+                    AmountDue = amountDue,
+                    GrossSales = grossSales,
+                    Returns = returns,
+                    NetOfReturns = Math.Round(grossSales - returns, 2),
+                    LessDiscount = lessDiscount,
+                    NetOfSales = netOfSales,
+                    Vatable = vatable,
+                    ZeroRated = zeroRated,
+                    Exempt = exempt,
+                    Vat = vat
+                };
+
+                // Add the initial transaction
+                transactionList.Add(baseTransaction);
+
+                // Update totals for base transaction (round each addition)
+                totalTransactionList.TotalGrossSales = Math.Round(totalTransactionList.TotalGrossSales + grossSales, 2);
+                totalTransactionList.TotalReturns = Math.Round(totalTransactionList.TotalReturns + returns, 2);
+                totalTransactionList.TotalNetOfReturns = Math.Round(totalTransactionList.TotalNetOfReturns + (grossSales - returns), 2);
+                totalTransactionList.TotalLessDiscount = Math.Round(totalTransactionList.TotalLessDiscount + lessDiscount, 2);
+                totalTransactionList.TotalNetOfSales = Math.Round(totalTransactionList.TotalNetOfSales + netOfSales, 2);
+                totalTransactionList.TotalVatable = Math.Round(totalTransactionList.TotalVatable + vatable, 2);
+                totalTransactionList.TotalExempt = Math.Round(totalTransactionList.TotalExempt + exempt, 2);
+                totalTransactionList.TotalVat = Math.Round(totalTransactionList.TotalVat + vat, 2);
+
+                // If order was cancelled, add a cancellation entry
+                if (order.IsCancelled && order.StatusChangeDate.HasValue)
+                {
+                    var cancelledTransaction = new TransactionListDTO
+                    {
+                        Date = order.StatusChangeDate.Value.ToString("MM/dd/yyyy"),
+                        InvoiceNum = $"{order.InvoiceNumber:D12}",
+                        Src = "VOIDED",
+                        DiscType = order.DiscountType ?? "",
+                        Percent = order.DiscountPercent?.ToString() ?? "",
+                        SubTotal = Math.Round(-subTotal, 2),
+                        AmountDue = Math.Round(-amountDue, 2),
+                        GrossSales = Math.Round(-grossSales, 2),
+                        Returns = 0m,
+                        NetOfReturns = Math.Round(-grossSales, 2),
+                        LessDiscount = Math.Round(-lessDiscount, 2),
+                        NetOfSales = Math.Round(-netOfSales, 2),
+                        Vatable = Math.Round(-vatable, 2),
+                        ZeroRated = 0m,
+                        Exempt = Math.Round(-exempt, 2),
+                        Vat = Math.Round(-vat, 2)
+                    };
+                    transactionList.Add(cancelledTransaction);
+
+                    // Update totals for cancellation (round each subtraction)
+                    totalTransactionList.TotalGrossSales = Math.Round(totalTransactionList.TotalGrossSales - grossSales, 2);
+                    totalTransactionList.TotalNetOfReturns = Math.Round(totalTransactionList.TotalNetOfReturns - grossSales, 2);
+                    totalTransactionList.TotalLessDiscount = Math.Round(totalTransactionList.TotalLessDiscount - lessDiscount, 2);
+                    totalTransactionList.TotalNetOfSales = Math.Round(totalTransactionList.TotalNetOfSales - netOfSales, 2);
+                    totalTransactionList.TotalVatable = Math.Round(totalTransactionList.TotalVatable - vatable, 2);
+                    totalTransactionList.TotalExempt = Math.Round(totalTransactionList.TotalExempt - exempt, 2);
+                    totalTransactionList.TotalVat = Math.Round(totalTransactionList.TotalVat - vat, 2);
+                }
+
+                // If order was returned, add a return entry
+                if (order.IsReturned && order.StatusChangeDate.HasValue)
+                {
+                    var returnedTransaction = new TransactionListDTO
+                    {
+                        Date = order.StatusChangeDate.Value.ToString("MM/dd/yyyy"),
+                        InvoiceNum = $"{order.InvoiceNumber:D12}",
+                        Src = "REFUNDED",
+                        DiscType = order.DiscountType ?? "",
+                        Percent = order.DiscountPercent?.ToString() ?? "",
+                        SubTotal = Math.Round(-subTotal, 2),
+                        AmountDue = Math.Round(-amountDue, 2),
+                        GrossSales = Math.Round(-grossSales, 2),
+                        Returns = Math.Round(grossSales, 2),
+                        NetOfReturns = 0m,
+                        LessDiscount = Math.Round(-lessDiscount, 2),
+                        NetOfSales = Math.Round(-netOfSales, 2),
+                        Vatable = Math.Round(-vatable, 2),
+                        ZeroRated = 0m,
+                        Exempt = Math.Round(-exempt, 2),
+                        Vat = Math.Round(-vat, 2)
+                    };
+                    transactionList.Add(returnedTransaction);
+
+                    // Update totals for return (round each operation)
+                    totalTransactionList.TotalGrossSales = Math.Round(totalTransactionList.TotalGrossSales - grossSales, 2);
+                    totalTransactionList.TotalReturns = Math.Round(totalTransactionList.TotalReturns + grossSales, 2);
+                    totalTransactionList.TotalNetOfReturns = Math.Round(totalTransactionList.TotalNetOfReturns - grossSales, 2);
+                    totalTransactionList.TotalLessDiscount = Math.Round(totalTransactionList.TotalLessDiscount - lessDiscount, 2);
+                    totalTransactionList.TotalNetOfSales = Math.Round(totalTransactionList.TotalNetOfSales - netOfSales, 2);
+                    totalTransactionList.TotalVatable = Math.Round(totalTransactionList.TotalVatable - vatable, 2);
+                    totalTransactionList.TotalExempt = Math.Round(totalTransactionList.TotalExempt - exempt, 2);
+                    totalTransactionList.TotalVat = Math.Round(totalTransactionList.TotalVat - vat, 2);
+                }
+            }
+
+            return (transactionList.OrderBy(t => t.InvoiceNum).ToList(), totalTransactionList);
+        }
 
         private void AddTimestampLog(
             List<UserActionLogDTO> logs,

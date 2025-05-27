@@ -10,7 +10,7 @@ namespace EBISX_POS.API.Services.Interfaces
         Task<XInvoiceReportDTO> XInvoiceReport();
         Task<ZInvoiceReportDTO> ZInvoiceReport();
         Task<List<UserActionLogDTO>> UserActionLog(bool isManagerLog, DateTime fromDate, DateTime toDate); 
-        Task<List<AuditTrailDTO>> GetAuditTrail(DateTime fromDate, DateTime toDate);
-
+        Task<(List<AuditTrailDTO> Data, string FilePath)> GetAuditTrail(DateTime fromDate, DateTime toDate, string folderPath);
+        Task<(List<TransactionListDTO> Data, TotalTransactionListDTO Totals, string FilePath)> GetTransactList(DateTime fromDate, DateTime toDate, string folderPath);
     }
 }
