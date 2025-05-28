@@ -13,24 +13,8 @@ using EBISX_POS.API.Services.PDF;
 
 namespace EBISX_POS.API.Services.Repositories
 {
-    public class ReportRepository : IReport
+    public class ReportRepository(DataContext _dataContext, IAuth _auth, AuditTrailPDFService _auditTrailPDFService, TransactionListPDFService _transactionListPDFService) : IReport
     {
-        private readonly DataContext _dataContext;
-        private readonly IAuth _auth;
-        private readonly AuditTrailPDFService _auditTrailPDFService;
-        private readonly TransactionListPDFService _transactionListPDFService;
-
-        public ReportRepository(
-            DataContext dataContext, 
-            IAuth auth, 
-            AuditTrailPDFService auditTrailPDFService, 
-            TransactionListPDFService transactionListPDFService)
-        {
-            _dataContext = dataContext;
-            _auth = auth;
-            _auditTrailPDFService = auditTrailPDFService;
-            _transactionListPDFService = transactionListPDFService;
-        }
 
         private async Task InitializePDFServices()
         {
